@@ -16,6 +16,9 @@ internal sealed class DrawMeshUnlit : Instance<DrawMeshUnlit>
 
     [Input(Guid = "922cf855-2676-4a96-9d90-622791a6a423", MappedType = typeof(SharedEnums.BlendModes))]
     public readonly InputSlot<int> BlendMode = new();
+    
+    [Input(Guid = "126F1902-147B-4276-8C13-550976E78973", MappedType = typeof(FillMode))]
+    public readonly InputSlot<int> FillMode = new InputSlot<int>();
 
     [Input(Guid = "8d223463-edff-45fb-9ead-6650a911cebd")]
     public readonly InputSlot<CullMode> Culling = new();
@@ -40,5 +43,8 @@ internal sealed class DrawMeshUnlit : Instance<DrawMeshUnlit>
 
     [Input(Guid = "48da47d3-8d30-4e85-8ecc-8c07894c54b4")]
     public readonly InputSlot<TextureAddressMode> TextureWrap = new InputSlot<TextureAddressMode>();
+
+        [Input(Guid = "33abccb4-cbf8-448b-95c7-b72d69c69af5")]
+        public readonly InputSlot<bool> UseVertexColor = new InputSlot<bool>();
 
 }

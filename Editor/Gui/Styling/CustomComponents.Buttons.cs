@@ -1,5 +1,6 @@
 ﻿using ImGuiNET;
 using T3.Core.DataTypes.Vector;
+using T3.Core.Utils;
 using T3.SystemUi;
 
 namespace T3.Editor.Gui.Styling;
@@ -47,12 +48,15 @@ internal static partial class CustomComponents
                                             Icon iconOn,
                                             ButtonStates stateIfOn = ButtonStates.Activated,
                                             ButtonStates stateIfOff = ButtonStates.Activated,
-                                            bool isEnabled = true)
+                                            bool isEnabled = true,
+                                            bool noBackground= false)
     {
         var state = !isEnabled ? ButtonStates.Disabled
                     : isOn ? stateIfOn : stateIfOff;
 
-        var clicked = IconButton(isOn ? iconOn : iconOff, Vector2.Zero, state);
+        var clicked = noBackground 
+                          ? TransparentIconButton(isOn ? iconOn : iconOff, Vector2.Zero, state) 
+                          : IconButton(isOn ? iconOn : iconOff, Vector2.Zero, state);
         
         if (clicked && isEnabled)
             isOn = !isOn;
@@ -100,6 +104,14 @@ internal static partial class CustomComponents
         return modified;
     }
 
+    public static bool TransparentIconButton(Icon icon, Vector2 size, ButtonStates state = ButtonStates.Normal)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Button, Color.Transparent.Rgba);
+        var result = IconButton(icon, size, state);
+        ImGui.PopStyleColor();
+        return result;
+    }
+    
     public static bool IconButton(Icon icon, Vector2 size, ButtonStates state = ButtonStates.Normal)
     {
         if (size == Vector2.Zero)
@@ -237,7 +249,72 @@ internal static partial class CustomComponents
 
         return false;
     }
+
+    internal static Vector2 GetCtaButtonSize(string label, Icon icon = Icon.None)
+    {
+        var showIcon = icon != Icon.None;
+        //var padding = new Vector2(10, 2);
+        ImGui.PushFont(Fonts.FontLarge);
+        var size = ImGui.CalcTextSize(label) + CtaButtonPadding * 2;
+        if (showIcon)
+            size.X += Icons.FontSize;
+
+        ImGui.PopFont();
+        return size;
+    }
     
+    private static Vector2 CtaButtonPadding => new Vector2(10, 2);
+    
+    internal static bool DrawCtaButton(string label, Icon icon, Color textColor, Color bgColor, Color borderColor)
+    {
+        var size = GetCtaButtonSize(label, icon);
+
+        var clicked = ImGui.InvisibleButton(label, size);
+        var min = ImGui.GetItemRectMin();
+        var max = ImGui.GetItemRectMax();
+        var dl = ImGui.GetWindowDrawList();
+        var isHovered = ImGui.IsItemHovered();
+
+        dl.AddRectFilled(min, max, bgColor.Fade(isHovered ? 0.8f : 1f), 5);
+        dl.AddRect(min, max, borderColor, 5);
+        dl.AddText(Fonts.FontLarge, Fonts.FontLarge.FontSize, min + CtaButtonPadding,
+                   textColor,
+                   label);
+
+        var screenPos = new Vector2(max.X - Icons.FontSize - CtaButtonPadding.X / 2,
+                                    (max.Y + min.Y) / 2f - Icons.FontSize / 2f + 1
+                                   ).Floor();
+
+        if (icon != Icon.None)
+            Icons.DrawIconAtScreenPosition(icon, screenPos, dl, textColor);
+        
+        return clicked;
+    }
+
+    internal static bool DrawCtaButton(string label, Icon icon = Icon.None, ButtonStates state = ButtonStates.Normal)
+    {
+        var textColor = UiColors.Text;
+        var bgColor = UiColors.BackgroundButton;
+        var borderColor = Color.Transparent;
+
+        switch (state)
+        {
+            case ButtonStates.Activated:
+                textColor = UiColors.ForegroundFull;
+                bgColor = UiColors.BackgroundActive;
+                borderColor = Color.Transparent;
+                break;
+            case ButtonStates.Dimmed:
+                textColor = UiColors.Text;
+                bgColor = Color.Transparent;
+                borderColor = UiColors.ForegroundFull.Fade(0.3f);
+                break;
+        }
+
+        return DrawCtaButton(label, icon, textColor, bgColor, borderColor);
+    }
+
+
     public enum ButtonStates
     {
         Normal,
@@ -245,5 +322,32 @@ internal static partial class CustomComponents
         Disabled,
         Activated,
         NeedsAttention,
+    }
+
+    /// <summary>
+    /// Draws an search match underline under the last search item
+    /// </summary>
+    public static void DrawSearchMatchUnderline(string searchString, ReadOnlySpan<char> strId, Vector2 offset)
+    {
+        if (string.IsNullOrEmpty(searchString)) 
+            return;
+        
+        var start = strId.IndexOf(searchString, StringComparison.OrdinalIgnoreCase);
+        if (start == -1) 
+            return;
+        
+        var span = strId.Slice(start, searchString.Length);
+        var sizeMatch = ImGui.CalcTextSize(span);
+
+        var sizeBefore = start > 0 ? ImGui.CalcTextSize(strId[..start])
+                             : Vector2.Zero;
+                    
+        var fontSize = ImGui.GetFontSize();
+        var min = 
+            //ImGui.GetItemRectMin() 
+                  offset
+                  + new Vector2( sizeBefore.X, fontSize) ;
+                    
+        ImGui.GetWindowDrawList().AddLine(min, min + new Vector2(sizeMatch.X,0), UiColors.BackgroundActive);
     }
 }

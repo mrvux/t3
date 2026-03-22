@@ -2,11 +2,12 @@
 using System.Diagnostics;
 using T3.Core.Operator;
 using T3.Core.Resource;
-using T3.Editor.Gui.Graph;
-using T3.Editor.Gui.Graph.Dialogs;
-using T3.Editor.Gui.Graph.Window;
+using T3.Editor.Gui;
+using T3.Editor.Gui.Dialogs;
+using T3.Editor.Gui.Window;
 using T3.Editor.Gui.Interaction;
 using T3.Editor.Gui.UiHelpers;
+using T3.Editor.Gui.Windows.Output;
 using T3.Editor.Gui.Windows.TimeLine;
 using T3.Editor.UiModel.Selection;
 
@@ -143,7 +144,7 @@ internal sealed partial class ProjectView
                 var parentSymbolId = composition.Instance.Parent.Symbol.Id;
                 _duplicateSymbolDialog.ShowNextFrame(); // actually shows this frame
                 _duplicateSymbolDialog.Draw(symbolGuid: parentSymbolId,
-                                            selectedChildUis: [symbolChildUi],
+                                            selectedChildUis2: [symbolChildUi],
                                             nameSpace: ref _dupeReadonlyNamespace,
                                             newTypeName: ref _dupeReadonlyName,
                                             description: ref _dupeReadonlyDescription,
@@ -234,7 +235,10 @@ internal sealed partial class ProjectView
         UserSettings.Save();
     }
 
-    public bool TrySetCompositionOp(IReadOnlyList<Guid> newIdPath, ScalableCanvas.Transition transition = ScalableCanvas.Transition.JumpIn, Guid? alsoSelectChildId = null)
+    public bool TrySetCompositionOp(IReadOnlyList<Guid> newIdPath, 
+                                    ScalableCanvas.Transition transition = ScalableCanvas.Transition.JumpIn, 
+                                    Guid? alsoSelectChildId = null,
+                                    bool tryRestoreViewArea = true)
     {
         var structure = OpenedProject.Structure;
         var newCompositionInstance = structure.GetInstanceFromIdPath(newIdPath);
@@ -288,8 +292,6 @@ internal sealed partial class ProjectView
                 //var instance = InstView.Instance.Children[alsoSelectChildId.Value];
                 NodeSelection.SetSelection(instance.GetChildUi()!, instance);
                 var bounds = NodeSelection.GetSelectionBounds(NodeSelection, instance, 400);
-                //var viewScope = ScalableCanvas.GetScopeForCanvasArea(bounds);
-                //ScalableCanvas.SetScopeWithTransition(viewScope, compositionChanged ? transition : ScalableCanvas.Transition.Smooth);
                 ScalableCanvas.RequestTargetViewAreaWithTransition(bounds, 
                                                                compositionChanged ? transition : ScalableCanvas.Transition.Smooth);
             }
@@ -299,8 +301,19 @@ internal sealed partial class ProjectView
             
                 var compositionOpSymbolChildId = CompositionInstance.SymbolChildId;
                 IEnumerable<ISelectableCanvasObject> childUisValues = InstView.SymbolUi.ChildUis.Values;
-                var savedOrValidView = CanvasHelpers.GetSavedOrValidViewForComposition(compositionOpSymbolChildId, childUisValues);
-                ScalableCanvas.RequestTargetViewAreaWithTransition(savedOrValidView, transition);
+
+                if (tryRestoreViewArea)
+                {
+                    var savedOrValidView = CanvasHelpers.GetSavedOrValidViewForComposition(compositionOpSymbolChildId, childUisValues);
+                    ScalableCanvas.RequestTargetViewAreaWithTransition(savedOrValidView, transition);
+                }
+                else
+                {
+                    var areaOnCanvas = NodeSelection.GetSelectionBounds(NodeSelection, CompositionInstance);
+                    ScalableCanvas.RequestTargetViewAreaWithTransition(areaOnCanvas, transition);
+                    FocusViewToSelection();
+                }
+                
             }
         }
         
@@ -355,16 +368,40 @@ internal sealed partial class ProjectView
         {
             if (graphWindow.ProjectView == this)
                 graphWindow.CloseView();
-            
-            if (graphWindow.Config.Visible && graphWindow.ProjectView != null)
-                Focused = graphWindow.ProjectView;
+
+            // if (graphWindow.Config.Visible && graphWindow.ProjectView != null)
+            // {
+            //     Focused = graphWindow.ProjectView;
+            // }
         }
+
+        foreach (var window in OutputWindow.OutputWindowInstances)
+        {
+            if (window is OutputWindow outputWindow)
+            {
+                outputWindow.Pinning.Unpin();
+            }
+        }
+
+        Focused = null;
     }
     
     public void SetAsFocused()
     {
         Focused = this;
     }
+
+    public void FocusViewToSelection()
+    {
+        if (CompositionInstance == null)
+            return;
+        
+        var areaOnCanvas = NodeSelection.GetSelectionBounds(NodeSelection, CompositionInstance);
+        areaOnCanvas.Expand(200);
+        
+        GraphView.Canvas.FitAreaOnCanvas(areaOnCanvas);
+    }
+    
     
     public static ProjectView? Focused { get; private set; }
 }

@@ -1,0 +1,31 @@
+{
+  "Id": "bf4daa46-ed0f-4a87-9ba1-93631b2ca29a"/*DelaunayMesh*/,
+  "Inputs": [
+    {
+      "Id": "0b30e8f2-44d7-41db-b38b-e6a053b1aeba"/*Tweak*/,
+      "DefaultValue": 0.0
+    },
+    {
+      "Id": "18fddd63-db79-4ee6-9a32-b90a5ceff582"/*BoundaryPoints*/,
+      "DefaultValue": null
+    },
+    {
+      "Id": "3236e937-9dbe-41e8-aafa-c0c13c56bcdf"/*Seed*/,
+      "DefaultValue": 0
+    },
+    {
+      "Id": "aba31520-065f-40c7-a4a6-a4470f1e0cdf"/*SubdivideLongEdges*/,
+      "DefaultValue": 0.0
+    },
+    {
+      "Id": "db3c69b1-403b-485b-94e8-fc7e8b566947"/*ExtraPoints*/,
+      "DefaultValue": null
+    },
+    {
+      "Id": "e00e4b12-8576-4a78-b773-17630b102a70"/*FillDensity*/,
+      "DefaultValue": 0.0
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}

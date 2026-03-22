@@ -32,7 +32,7 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
 
     // --- Discovery (ArtPoll) Resources ---
     private Timer? _artPollTimer;
-    private bool _connected;
+    private volatile bool _connected;
     private List<(int universe, byte[] data)>? _dmxDataToSend;
     private volatile bool _isPolling;
     private string? _lastErrorMessage;
@@ -41,6 +41,8 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
     private volatile bool _printToLog;
     private IPAddress? _selectedSubnetMask;
     private CancellationTokenSource? _senderCts;
+    private double _lastRetryTime;
+    private double _lastNetworkRefreshTime;
 
     // --- High-Performance Sending Resources ---
     private Thread? _senderThread;
@@ -59,8 +61,30 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
     {
         _printToLog = PrintToLog.GetValue(context);
 
+        var localIpString = LocalIpAddress.GetValue(context);
+
+        // Restore SubnetMask if it's null (e.g. on load)
+        if (_selectedSubnetMask == null && !string.IsNullOrEmpty(localIpString))
+        {
+            var adapter = _networkInterfaces.FirstOrDefault(ni => ni.IpAddress.ToString() == localIpString);
+            if (adapter == null)
+            {
+                if (context.LocalTime - _lastNetworkRefreshTime > 2.0)
+                {
+                    _lastNetworkRefreshTime = context.LocalTime;
+                    _networkInterfaces = GetNetworkInterfaces();
+                    adapter = _networkInterfaces.FirstOrDefault(ni => ni.IpAddress.ToString() == localIpString);
+                }
+            }
+            
+            if (adapter != null)
+            {
+                _selectedSubnetMask = adapter.SubnetMask;
+            }
+        }
+
         var settingsChanged = _connectionSettings.Update(
-                                                         LocalIpAddress.GetValue(context) ?? string.Empty,
+                                                         localIpString ?? string.Empty,
                                                          _selectedSubnetMask,
                                                          TargetIpAddress.GetValue(context) ?? string.Empty,
                                                          SendUnicast.GetValue(context)
@@ -72,6 +96,14 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
             if (_printToLog) Log.Debug("Artnet Output: Reconnecting Art-Net socket...", this);
             CloseSocket();
             _connected = TryConnectArtNet(_connectionSettings.LocalIp);
+        }
+        else if (!_connected && _connectionSettings.LocalIp != null)
+        {
+            if (context.LocalTime - _lastRetryTime > 2.0)
+            {
+                _lastRetryTime = context.LocalTime;
+                _connected = TryConnectArtNet(_connectionSettings.LocalIp);
+            }
         }
 
         var discoverNodes = PrintArtnetPoll.GetValue(context);
@@ -101,17 +133,62 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
         SetStatus("Connected and sending.", IStatusProvider.StatusLevel.Success);
 
         // --- Prepare Data for Sending Thread ---
-        var startUniverse = StartUniverse.GetValue(context);
         var inputValueLists = InputsValues.GetCollectedTypedInputs();
 
+        // Get universe channels list (starting universe for each input)
+        var universeChannels = UniverseChannels.GetValue(context);
+
+        // Auto-resize UniverseChannels list to match number of inputs
+        if (universeChannels == null)
+        {
+            universeChannels = new List<int>();
+        }
+
+        // Calculate next available universe for auto-expansion
+        int nextUniverse = 1;
+        if (universeChannels.Count > 0)
+        {
+            // Find the last input's starting universe and add its chunk count
+            var lastInputIndex = universeChannels.Count - 1;
+            if (lastInputIndex < inputValueLists.Count)
+            {
+                var lastBuffer = inputValueLists[lastInputIndex].GetValue(context);
+                if (lastBuffer != null)
+                {
+                    int lastChunkCount = (int)Math.Ceiling(lastBuffer.Count / 512.0);
+                    nextUniverse = universeChannels[lastInputIndex] + lastChunkCount;
+                }
+                else
+                {
+                    nextUniverse = universeChannels[lastInputIndex];
+                }
+            }
+            else
+            {
+                nextUniverse = universeChannels[^1] + 1;
+            }
+        }
+
+        // Ensure list size matches input count
+        while (universeChannels.Count < inputValueLists.Count)
+        {
+            universeChannels.Add(nextUniverse);
+            nextUniverse++;
+        }
+
+        // Update the input with the auto-resized list
+        UniverseChannels.SetTypedInputValue(universeChannels);
+
         const int chunkSize = 512;
-        var universeIndex = startUniverse;
         var preparedData = new List<(int universe, byte[] data)>();
 
-        foreach (var input in inputValueLists)
+        for (int inputIdx = 0; inputIdx < inputValueLists.Count; inputIdx++)
         {
+            var input = inputValueLists[inputIdx];
             var buffer = input.GetValue(context);
             if (buffer == null) continue;
+
+            var universeForInput = inputIdx < universeChannels.Count ? universeChannels[inputIdx] : 1;
 
             for (var i = 0; i < buffer.Count; i += chunkSize)
             {
@@ -128,8 +205,8 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
                     dmxData[j] = (byte)buffer[i + j].Clamp(0, 255);
                 }
 
-                preparedData.Add((universeIndex, dmxData));
-                universeIndex++;
+                preparedData.Add((universeForInput, dmxData));
+                universeForInput++;
             }
         }
 
@@ -219,28 +296,31 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
                 nextFrameTimeTicks += (long)(Stopwatch.Frequency / (double)maxFpsCopy);
             }
 
-            // --- Send Data (Lock socket access to prevent race conditions with reconnection) ---
+            // --- Send Data ---
+            Socket? currentSocket;
+            IPEndPoint? targetEndPoint;
+
             lock (_connectionSettings)
             {
-                var currentSocket = _socket;
-                var targetEndPoint = _connectionSettings.TargetEndPoint;
+                currentSocket = _socket;
+                targetEndPoint = _connectionSettings.TargetEndPoint;
+            }
 
-                if (currentSocket == null || !_connected || targetEndPoint == null)
+            if (currentSocket == null || !_connected || targetEndPoint == null)
+            {
+                // Sleep briefly to prevent a tight busy-loop if disconnected
+                Thread.Sleep(100);
+                continue;
+            }
+
+            if (syncCopy) SendArtSync(currentSocket, targetEndPoint);
+
+            if (dataCopy != null)
+            {
+                foreach (var (universe, data) in dataCopy)
                 {
-                    // Sleep briefly to prevent a tight busy-loop if disconnected
-                    Thread.Sleep(100);
-                    continue;
-                }
-
-                if (syncCopy) SendArtSync(currentSocket, targetEndPoint);
-
-                if (dataCopy != null)
-                {
-                    foreach (var (universe, data) in dataCopy)
-                    {
-                        if (token.IsCancellationRequested) break;
-                        SendDmxPacket(currentSocket, targetEndPoint, universe, data, sequenceNumber);
-                    }
+                    if (token.IsCancellationRequested) break;
+                    SendDmxPacket(currentSocket, targetEndPoint, universe, data, sequenceNumber);
                 }
             }
 
@@ -446,6 +526,15 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
                               };
                 _socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
                 _socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                
+                try
+                {
+                    // Disable SIO_UDP_CONNRESET (WSAECONNRESET) to prevent socket death on ICMP Port Unreachable
+                    const int SIO_UDP_CONNRESET = -1744830452;
+                    _socket.IOControl(SIO_UDP_CONNRESET, new byte[] { 0 }, null);
+                }
+                catch { /* Ignore on platforms where not supported */ }
+
                 _socket.Bind(new IPEndPoint(localIp, ArtNetPort));
                 _lastErrorMessage = null;
                 if (_printToLog) Log.Debug($"Artnet Output: Socket bound to {localIp}:{ArtNetPort}.", this);
@@ -472,7 +561,7 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
         return new IPAddress(broadcastBytes);
     }
 
-    private static readonly List<NetworkAdapterInfo> _networkInterfaces = GetNetworkInterfaces();
+    private static List<NetworkAdapterInfo> _networkInterfaces = GetNetworkInterfaces();
 
     private static List<NetworkAdapterInfo> GetNetworkInterfaces()
     {
@@ -508,7 +597,7 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
 
         public bool Update(string localIpStr, IPAddress? subnetMask, string targetIpStr, bool sendUnicast)
         {
-            if (_lastLocalIpStr == localIpStr && _lastTargetIpStr == targetIpStr && _lastSendUnicast == sendUnicast) return false;
+            if (_lastLocalIpStr == localIpStr && _lastTargetIpStr == targetIpStr && _lastSendUnicast == sendUnicast && SubnetMask == subnetMask) return false;
 
             _lastLocalIpStr = localIpStr;
             _lastTargetIpStr = targetIpStr;
@@ -556,6 +645,7 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
     {
         if (inputId == LocalIpAddress.Id)
         {
+            _networkInterfaces = GetNetworkInterfaces();
             foreach (var adapter in _networkInterfaces) yield return adapter.DisplayName;
         }
         else if (inputId == TargetIpAddress.Id)
@@ -593,8 +683,9 @@ internal sealed class ArtnetOutput : Instance<ArtnetOutput>, IStatusProvider, IC
     [Input(Guid = "F7520A37-C2D4-41FA-A6BA-A6ED0423A4EC")]
     public readonly MultiInputSlot<List<int>> InputsValues = new();
 
-    [Input(Guid = "34aeeda5-72b0-4f13-bfd3-4ad5cf42b24f")]
-    public readonly InputSlot<int> StartUniverse = new();
+    [Input(Guid = "B2C3D4E5-F6A7-8901-BCDE-F234567890AB")]
+    public readonly InputSlot<List<int>> UniverseChannels = new();
+
 
     [Input(Guid = "fcbfe87b-b8aa-461c-a5ac-b22bb29ad36d")]
     public readonly InputSlot<string> LocalIpAddress = new();

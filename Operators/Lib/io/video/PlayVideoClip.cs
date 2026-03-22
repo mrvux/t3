@@ -3,6 +3,7 @@ using SharpDX.Direct3D;
 using SharpDX.Mathematics.Interop;
 using SharpDX.MediaFoundation;
 using T3.Core.Audio;
+using T3.Core.IO;
 using T3.Core.Utils;
 
 namespace Lib.io.video;
@@ -103,16 +104,18 @@ internal sealed class PlayVideoClip : Instance<PlayVideoClip>
         videoEnd = Math.Clamp(videoEnd, 0.0, _engine.Duration);
 
         // shall we seek?
+        var isExporting = context.Playback.IsRenderingToFile;
         var clampedTime = Math.Clamp(shouldBeTimeInSecs, videoStart, videoEnd);
         var videoTime = Math.Clamp(_engine.CurrentTime, videoStart, videoEnd);
         var deltaTime = clampedTime - videoTime;
+        var threshold = isExporting ? 0.01f : ResyncThreshold.GetValue(context);
         var shouldSeek = reloadedPath || (!_engine.IsSeeking
-                                          && Math.Abs(deltaTime) > ResyncThreshold.GetValue(context));
+                                          && Math.Abs(deltaTime) > threshold);
 
         // Play when we are in the center portion of the video
         // and we are playing the video forward
-        _play = reloadedPath ||
-                (shouldBeTimeInSecs == clampedTime && clampedTime - _lastUpdateTime > 0.0);
+        _play = !isExporting && (reloadedPath ||
+                (shouldBeTimeInSecs == clampedTime && clampedTime - _lastUpdateTime > 0.0));
         _lastUpdateTime = clampedTime;
 
         // initiate seeking if necessary
@@ -123,21 +126,8 @@ internal sealed class PlayVideoClip : Instance<PlayVideoClip>
             Seek = true;
         }
 
-        /***
-         * Mute video if audio engine is muted
-         * FIXME: does not work when the video is not updating...
-         *
-         * Fixing this will require some thought: To managed audio-levels and playback centrally we probably need
-         * an interfaces to register all audio sources and provides functions like muting, stop, setting audio level, etc.
-         */
-        if (AudioEngine.IsMuted)
-        {
-            _engine.Volume = 0.0;
-        }
-        else
-        {
-            _engine.Volume = Volume.GetValue(context).Clamp(0f, 1f);
-        }
+        // Set the volume while respecting the global mute/volume settings
+        _engine.Volume = ProjectSettings.Config.GlobalMute ? 0 : Volume.GetValue(context).Clamp(0f, 1f) * ProjectSettings.Config.GlobalPlaybackVolume;
 
         UpdateVideo();
     }
@@ -396,10 +386,15 @@ internal sealed class PlayVideoClip : Instance<PlayVideoClip>
     {
         Log.Warning($"Disposing video player");
         base.Dispose(disposing);
-        _engine.Shutdown();
-        _engine.PlaybackEvent -= EnginePlaybackEventHandler;
-        _engine.Dispose();
-        _texture.Dispose();
+        
+        if (_engine != null)
+        {
+            _engine.Shutdown();
+            _engine.PlaybackEvent -= EnginePlaybackEventHandler;
+            _engine.Dispose();
+        }
+        
+        _texture?.Dispose();
         //colorSpaceConverter.Dispose();
         //renderTarget?.Dispose();
     }

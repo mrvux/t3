@@ -4,8 +4,11 @@ using System.IO;
 using T3.Core.Compilation;
 using T3.Core.Operator;
 using T3.Core.Resource;
+using T3.Core.Resource.Assets;
 using T3.Core.SystemUi;
+using T3.Core.UserData;
 using T3.Editor.Compilation;
+using T3.Editor.Gui.UiHelpers.Thumbnails;
 
 namespace T3.Editor.UiModel;
 
@@ -20,17 +23,18 @@ internal sealed partial class EditableSymbolProject : EditorSymbolPackage
     /// <summary>
     /// Create a new <see cref="EditableSymbolProject"/> using the given <see cref="CsProjectFile"/>.
     /// </summary>
-    public EditableSymbolProject(CsProjectFile csProjectFile) : base(assembly: AssemblyInformation.CreateUninitialized(), directory: csProjectFile.Directory, false)
+    public EditableSymbolProject(CsProjectFile csProjectFile) : 
+        base(assembly: AssemblyInformation.CreateUninitialized(), directory: csProjectFile.Directory, false)
     {
         AssemblyInformation.Initialize(csProjectFile.GetBuildTargetDirectory(), false);
         CsProjectFile = csProjectFile;
-        Log.Info($"Adding project {csProjectFile.Name}...");
+        //Log.Info($"Adding project {csProjectFile.Name}...");
         _csFileWatcher = new CodeFileWatcher(this, OnFileChanged, OnCodeFileRenamed);
         _csFileWatcher.EnableRaisingEvents = true;
         DisplayName = $"{csProjectFile.Name} ({CsProjectFile.RootNamespace})";
         SymbolUpdated += OnSymbolUpdated;
         SymbolRemoved += OnSymbolRemoved;
-        InitializeResources();
+        InitializeAssets();
 
         _allProjectsCache = null;
     }
@@ -92,6 +96,26 @@ internal sealed partial class EditableSymbolProject : EditorSymbolPackage
         newDestinationProject.SymbolUiDict.TryAdd(id, symbolUi);
         newDestinationProject.FilePathHandlers.TryAdd(id, symbolPathHandler);
         
+        // Copy thumbnails...
+        {
+            var sourceFilePath = Path.Combine(Folder, FileLocations.MetaSubFolder, ThumbnailManager.ThumbnailsSubFolder, id + ".png");
+            if (File.Exists(sourceFilePath))
+            {
+                var targetFolder = Path.Combine(newDestinationProject.Folder, FileLocations.MetaSubFolder, ThumbnailManager.ThumbnailsSubFolder);
+                var targetFilePath = Path.Combine(targetFolder, id + ".png");
+                Directory.CreateDirectory(targetFolder);
+                try
+                {
+                    File.Move(sourceFilePath, targetFilePath);
+                }
+                catch (Exception e)
+                {
+                    Log.Warning("Can't move thumbnail " + e.Message);
+                }
+            }
+        }
+        
+        
         // move files to new project - incorrect paths will be corrected by the loading process
         symbolPathHandler.UpdateFromSymbol();
         
@@ -101,7 +125,7 @@ internal sealed partial class EditableSymbolProject : EditorSymbolPackage
     }
 
 
-    private static readonly string[] FolderExclusions = { "bin", "obj", "dependencies" };
+    private static readonly string[] _folderExclusions = ["bin", "obj", "dependencies", FileLocations.ExportSubFolder];
 
     protected override IEnumerable<string> SymbolUiSearchFiles => FindFilesOfType(SymbolUiExtension);
 
@@ -109,19 +133,39 @@ internal sealed partial class EditableSymbolProject : EditorSymbolPackage
     
     protected override IEnumerable<string> SourceCodeSearchFiles => FindFilesOfType(SourceCodeExtension);
 
+    
+    
     private IEnumerable<string> FindFilesOfType(string fileExtension)
     {
         var directoryInfo = new DirectoryInfo(Folder);
         return directoryInfo.EnumerateDirectories()
-                        .Where(x => !FolderExclusions.Contains(x.Name))
+                        .Where(x => !_folderExclusions.Contains(x.Name))
                         .SelectMany(x => x.EnumerateFiles($"*{fileExtension}", SearchOption.AllDirectories))
                         .Concat(directoryInfo.EnumerateFiles($"*{fileExtension}")).Select(x => x.FullName);
     }
 
-    protected override void InitializeResources()
+    protected override void InitializeAssets()
     {
-        base.InitializeResources();
-        _resourceFileWatcher = new ResourceFileWatcher(ResourcesFolder);
+        base.InitializeAssets();
+        _resourceFileWatcher = new ResourceFileWatcher(AssetsFolder);
+        
+        _resourceFileWatcher.FileCreated += (_, path) =>
+                                            {
+                                                var isDirectory = Directory.Exists(path);
+                                                
+                                                AssetRegistry.RegisterPackageEntry(new FileInfo(path), this, isDirectory);
+                                                ResourceFileWatcher.FileStateChangeCounter++;
+                                            };
+
+        _resourceFileWatcher.FileRenamed += (oldPath, newPath) => 
+                                            {
+                                                AssetRegistry.UpdateMovedAsset(oldPath, newPath);
+                                            };
+
+        _resourceFileWatcher.FileDeleted += (_, path) => 
+                                            {
+                                                AssetRegistry.UnregisterAbsoluteFilePath(path, this);
+                                            };
     }
 
     public override void Dispose()
@@ -143,21 +187,25 @@ internal sealed partial class EditableSymbolProject : EditorSymbolPackage
     public override bool IsReadOnly => false;
     
 
-    private static IEnumerable<EditableSymbolProject>? _allProjectsCache = null;
+    private static IEnumerable<EditableSymbolProject>? _allProjectsCache;
     public static IEnumerable<EditableSymbolProject> AllProjects
     {
         get
         {
-            if (_allProjectsCache == null)
-            {
-                _allProjectsCache = ProjectSetup
-                    .AllPackages
-                    .Where(x => x is EditableSymbolProject)
-                    .Cast<EditableSymbolProject>()
-                    .OrderByDescending(x => x.CsProjectFile.ModifiedAt)
-                    .ToList();
-            }
+            _allProjectsCache ??= ProjectSetup
+                                 .AllPackages
+                                 .Where(x => x is EditableSymbolProject)
+                                 .Cast<EditableSymbolProject>()
+                                 .OrderByDescending(x => x.CsProjectFile.ModifiedAt)
+                                 .ToList();
+            
             return _allProjectsCache;
         }
+    }
+    
+    //  New helper to force reload internally
+    public void MarkCodeExternallyModified()
+    {
+        CodeExternallyModified = true;
     }
 }

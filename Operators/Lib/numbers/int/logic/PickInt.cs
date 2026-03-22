@@ -16,12 +16,39 @@ internal sealed class PickInt : Instance<PickInt>
     private void Update(EvaluationContext context)
     {
         var connections = InputValues.GetCollectedTypedInputs();
-        if (connections == null || connections.Count == 0)
-            return;
-
         var index = Index.GetValue(context).Mod(connections.Count);
+        
+        InputValues.DirtyFlag.Clear();
+        if (connections.Count == 0)
+        {
+            InputValues.DirtyFlag.Clear();
+            return;
+        }
+
         Selected.Value = connections[index].GetValue(context);
+        
+        // Clear dirty flag
+        
+        // FIXME: Normally this should clear the dirty flag.
+        // Setting this only on first frame update is normally sufficient,
+        // but in CustomPointShader, this only clears the state later.
+        //
+        // Temporarily enabled.
+        
+        //Log.Debug($"Update {InputValues.DirtyFlag.IsDirty}", this);        
+        //if (_isFirstUpdate)
+        {
+            foreach (var c in connections)
+            {
+                c.GetValue(context);
+            }
+
+            _isFirstUpdate = false;
+        }
+        InputValues.DirtyFlag.Clear();
     }
+    
+    private bool _isFirstUpdate = true;
 
     [Input(Guid = "2C0A4EB2-DA56-449D-91B8-5BA0870FBEB4")]
     public readonly MultiInputSlot<int> InputValues = new();

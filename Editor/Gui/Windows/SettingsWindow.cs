@@ -2,18 +2,18 @@ using System.IO;
 using ImGuiNET;
 using Operators.Utils;
 using T3.Core.IO;
-using T3.Core.UserData;
 using T3.Core.Utils;
 using T3.Editor.Gui.Input;
 using T3.Editor.Gui.Interaction.Keyboard;
 using T3.Editor.Gui.Interaction.Midi;
 using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
+using T3.Editor.Skills.Training;
 using T3.Editor.UiModel.Helpers;
 
 namespace T3.Editor.Gui.Windows;
 
-internal sealed class SettingsWindow : Window
+internal sealed partial class SettingsWindow : Window
 {
     internal SettingsWindow()
     {
@@ -25,6 +25,7 @@ internal sealed class SettingsWindow : Window
         Interface,
         Theme,
         Project,
+        Audio,
         Midi,
         OSC,
         SpaceMouse,
@@ -37,9 +38,10 @@ internal sealed class SettingsWindow : Window
     protected override void DrawContent()
     {
         var changed = false;
-
-        ImGui.BeginChild("categories", new Vector2(120 * T3Ui.UiScaleFactor, -1), 
-                         true, 
+        var projectSettingsChanged = false;
+        
+        ImGui.BeginChild("categories", new Vector2(120 * T3Ui.UiScaleFactor, -1),
+                         true,
                          ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoBackground);
         {
             ImGui.PushStyleVar(ImGuiStyleVar.ButtonTextAlign, new Vector2(0, 0.5f));
@@ -71,10 +73,9 @@ internal sealed class SettingsWindow : Window
                                                           "Value input method",
                                                           "The control that pops up when dragging on a number value"
                                                          );
-                    
-                    
-                    changed |= FormInputs.AddInt("Value input smoothing", 
-                                                 ref UserSettings.Config.ValueEditSmoothing, 
+
+                    changed |= FormInputs.AddInt("Value input smoothing",
+                                                 ref UserSettings.Config.ValueEditSmoothing,
                                                  0, 20, 0.1f,
                                                  """
                                                  Smoothes the result of value edit controllers. 
@@ -93,19 +94,9 @@ internal sealed class SettingsWindow : Window
                                                           This also will affect usability and performance
                                                           """, UserSettings.Defaults.GraphStyle
                                                          );
-                    
 
-                    
                     if (UserSettings.Config.GraphStyle == UserSettings.GraphStyles.Magnetic)
                     {
-                        // changed |= FormInputs.AddCheckBox("Disconnect on unsnap",
-                        //                                   ref UserSettings.Config.DisconnectOnUnsnap,
-                        //                                   """
-                        //                                   Defines if unsnapping operators from a block will automatically disconnect them.
-                        //                                   Ops dragged out between snapped blocks will always be disconnected.
-                        //                                   """,
-                        //                                   UserSettings.Defaults.DisconnectOnUnsnap);
-
                         changed |= FormInputs.AddCheckBox("Snap horizontally",
                                                           ref UserSettings.Config.EnableHorizontalSnapping,
                                                           """
@@ -113,17 +104,16 @@ internal sealed class SettingsWindow : Window
                                                           This can be useful because connections of vertically aligned operators will avoid overlapping.  
                                                           """,
                                                           UserSettings.Defaults.EnableHorizontalSnapping);
-                        
+
                         changed |= FormInputs.AddFloat("Connection radius",
                                                        ref UserSettings.Config.MaxCurveRadius,
-                                                       0.0f, 1000f, 1f, true, true, 
+                                                       0.0f, 1000f, 1f, true, true,
                                                        "Controls the roundness of curve lines",
                                                        UserSettings.Defaults.MaxCurveRadius);
                         changed |= FormInputs.AddInt("Connection segments",
-                                                       ref UserSettings.Config.MaxSegmentCount, 1, 100, 1f,
-                                                       "Controls the number of segments used to draw connections between operators.", UserSettings.Defaults.MaxSegmentCount);
-                        
-
+                                                     ref UserSettings.Config.MaxSegmentCount, 1, 100, 1f,
+                                                     "Controls the number of segments used to draw connections between operators.",
+                                                     UserSettings.Defaults.MaxSegmentCount);
                     }
                     else
                     {
@@ -147,7 +137,7 @@ internal sealed class SettingsWindow : Window
                     }
 
                     FormInputs.AddVerticalSpace();
-
+                    
                     changed |= FormInputs.AddFloat("Scroll smoothing",
                                                    ref UserSettings.Config.ScrollSmoothing,
                                                    0.0f, 0.2f, 0.01f, true, true,
@@ -165,18 +155,28 @@ internal sealed class SettingsWindow : Window
                                                    0.0f, 200f, 0.01f, true, true, "Size of the transform gizmo in 3d views",
                                                    UserSettings.Defaults.GizmoSize);
 
-                    
                     changed |= FormInputs.AddCheckBox("Enable keyboard shortcut",
                                                       ref UserSettings.Config.EnableKeyboardShortCuts,
                                                       "This might prevent unintended user interactions while live performing with [KeyInput] operators.",
                                                       UserSettings.Defaults.EnableKeyboardShortCuts);
-                    
+
                     changed |= FormInputs.AddCheckBox("Display names with spaces",
                                                       ref UserSettings.Config.AddSpacesToParameterNames,
                                                       """
                                                       Developers use PascalCase (XAxisValue) when coding. Turn this on to display those names with spaces (X Axis Value) for easier reading.
                                                       """,
-                                                      UserSettings.Defaults.AddSpacesToParameterNames);                    
+                                                      UserSettings.Defaults.AddSpacesToParameterNames);
+
+                    FormInputs.AddVerticalSpace();
+                    FormInputs.AddSectionSubHeader("Input");
+                    
+                    changed |= FormInputs.AddCheckBox("Enable Touchpad Panning",
+                                                      ref UserSettings.Config.UseTouchPadPanning,
+                                                      """
+                                                      Use your trackpad for panning your graph and timeline views.
+                                                      Zooming in/out is possible with pinch zoom.
+                                                      """, 
+                                                      UserSettings.Defaults.UseTouchPadPanning);
                     
                     FormInputs.AddVerticalSpace();
                     FormInputs.AddSectionSubHeader("Timeline");
@@ -192,23 +192,26 @@ internal sealed class SettingsWindow : Window
                                                    0.0f, 0.2f, 0.01f, true, true,
                                                    "Controls the distance until items such as keyframes snap in the timeline",
                                                    UserSettings.Defaults.SnapStrength);
-                    
-                    changed |= FormInputs.AddFloat("Audio Volume",
-                                                   ref ProjectSettings.Config.PlaybackVolume,
-                                                   0.0f, 10f, 0.01f, true, true,
-                                                   "Limit the audio playback volume",
-                                                   ProjectSettings.Defaults.PlaybackVolume);
-
-                    changed |= FormInputs.AddEnumDropdown(ref UserSettings.Config.FrameStepAmount,
-                                                          "Frame step amount",
-                                                          "Controls the next rounding and step amount when jumping between frames.\nDefault shortcut is Shift+Cursor Left/Right"
-                                                        , UserSettings.Defaults.FrameStepAmount);
-
                     changed |= FormInputs.AddCheckBox("Reset time after playback",
                                                       ref UserSettings.Config.ResetTimeAfterPlayback,
                                                       "After the playback is halted, the time will reset to the moment when the playback began. This feature proves beneficial for iteratively reviewing animations without requiring manual rewinding.",
                                                       UserSettings.Defaults.ResetTimeAfterPlayback);
 
+
+                    FormInputs.AddVerticalSpace();
+                    FormInputs.AddSectionSubHeader("Skill Quest");
+                    FormInputs.SetIndentToLeft();
+                    changed |= FormInputs.AddCheckBox("Show Skill Quest in Hub",
+                                                      ref UserSettings.Config.ShowSkillQuestInHub,
+                                                      null,
+                                                      UserSettings.Defaults.ShowSkillQuestInHub);
+
+                    FormInputs.AddVerticalSpace();
+                    FormInputs.ApplyIndent();
+                    if (ImGui.Button("Reset Skills Progress"))
+                        SkillTraining.ResetProgress();
+
+                    
                     FormInputs.SetIndentToLeft();
                     FormInputs.AddVerticalSpace();
 
@@ -266,33 +269,52 @@ internal sealed class SettingsWindow : Window
 
                 case Categories.Project:
                 {
-                    var projectSettingsChanged = false;
                     FormInputs.AddSectionHeader("Project specific settings");
                     FormInputs.AddVerticalSpace();
 
                     FormInputs.AddSectionSubHeader("Project Settings");
-                    changed |= FormInputs.AddStringInput("Project Directory",
-                                                         ref UserSettings.Config.ProjectsFolder,
-                                                         "Folder",
-                                                         Directory.Exists(UserSettings.Config.ProjectsFolder) ? null : "Folder does not exists",
-                                                         """
-                                                         A writable directory for your projects.
-                                                         Changing it will require a restart!
-                                                         """,
-                                                         FileLocations.DefaultProjectFolder);
+                    var selectedProjectDirectory = string.Empty;
+                    var projectDirectories = UserSettings.Config.ProjectDirectories ?? new List<string>();
+                    changed |= FormInputs.AddEditableListBox(ref selectedProjectDirectory,
+                                                             projectDirectories,
+                                                             "Project Directories",
+                                                             Directory.Exists,
+                                                             "Folder does not exist",
+                                                             """
+                                                             List of top-level directories that are scanned for projects.
+                                                             
+                                                             This can be useful to manage your projects on multiple external drivers or repositories. 
+                                                             
+                                                             Changes require a restart.
+                                                             """
+                                                            );
                     
+                    FormInputs.AddVerticalSpace();
+                    FormInputs.SetIndentToLeft();
+                    changed |= FormInputs.AddCheckBox("Detect Projects on USB",
+                                                      ref UserSettings.Config.EnableUsbProjectDetection,
+                                                      """
+                                                      When enabled, connected USB drives will be monitored for projects in the "TiXLProjects" folder.
+                                                      This can be useful in cases where you want to work on projects from removable media.
+                                                      """,
+                                                      true
+                                                     );
+                    
+                    FormInputs.SetIndentToParameters();
                     FormInputs.AddVerticalSpace();
                     changed |= FormInputs.AddStringInput("UserName",
                                                          ref UserSettings.Config.UserName,
                                                          "Nickname",
-                                                          GraphUtils.IsValidProjectName(UserSettings.Config.UserName)? null :"Must not contain spaces or special characters",
-                                                           """
-                                                           Enter your nickname to group your projects into a namespace.
-                                                           Your nickname should be short and not contain spaces or special characters.
-                                                           """,
-                                                           Environment.UserName.ToValidClassName("Unknown"));                    
+                                                         GraphUtils.IsValidProjectName(UserSettings.Config.UserName)
+                                                             ? null
+                                                             : "Must not contain spaces or special characters",
+                                                         """
+                                                         Enter your nickname to group your projects into a namespace.
+                                                         Your nickname should be short and not contain spaces or special characters.
+                                                         """,
+                                                         Environment.UserName.ToValidClassName("Unknown"));
                     FormInputs.SetIndentToLeft();
-                    
+
                     changed |= FormInputs.AddCheckBox("Enable Backup",
                                                       ref UserSettings.Config.EnableAutoBackup,
                                                       $"""
@@ -303,7 +325,7 @@ internal sealed class SettingsWindow : Window
                                                        They are saved as zip-archives to {AutoBackup.AutoBackup.BackupDirectory}.
                                                        """,
                                                       UserSettings.Defaults.EnableAutoBackup);
-                    
+
                     FormInputs.AddSectionSubHeader("Performance Settings");
                     FormInputs.SetIndentToLeft();
 
@@ -311,7 +333,7 @@ internal sealed class SettingsWindow : Window
                                                                      ref ProjectSettings.Config.SkipOptimization,
                                                                      "This make working with shader graphs easier.",
                                                                      ProjectSettings.Config.SkipOptimization);
-                    
+
                     projectSettingsChanged |= FormInputs.AddCheckBox("Enable DirectX Debug Mode",
                                                                      ref ProjectSettings.Config.EnableDirectXDebug,
                                                                      """
@@ -321,14 +343,21 @@ internal sealed class SettingsWindow : Window
                                                                      Changing this option requires a restart.
                                                                      """,
                                                                      ProjectSettings.Config.EnableDirectXDebug);
+
+                    changed |= FormInputs.AddCheckBox("Load multi-threaded",
+                                                                     ref UserSettings.Config.LoadMultiThreaded,
+                                                                     """
+                                                                     Using multi-threading for loading projects can significantly increase startup time.
+                                                                     During development or if loading freezes during startup it might be useful for disable this settings.
+                                                                     """,
+                                                                     UserSettings.Config.LoadMultiThreaded);
                     
                     FormInputs.AddSectionSubHeader("Audio Sync");
-                    
+
                     FormInputs.SetIndentToParameters();
 
-
                     FormInputs.AddVerticalSpace();
-                    
+
                     FormInputs.AddSectionSubHeader("Export Settings");
                     CustomComponents.HelpText("These settings only when playback as executable");
                     FormInputs.AddVerticalSpace();
@@ -345,11 +374,13 @@ internal sealed class SettingsWindow : Window
 
 
 
-                    if (projectSettingsChanged)
-                        ProjectSettings.Save();
-
                     FormInputs.SetIndentToParameters();
 
+                    break;
+                }
+                case Categories.Audio:
+                {
+                    DrawAudioPanel(ref changed);
                     break;
                 }
                 case Categories.Midi:
@@ -359,7 +390,6 @@ internal sealed class SettingsWindow : Window
                     if (ImGui.Button("Rescan devices"))
                     {
                         MidiConnectionManager.Rescan();
-                        //MidiOutConnectionManager.Init();
                         CompatibleMidiDeviceHandling.InitializeConnectedDevices();
                     }
 
@@ -429,101 +459,128 @@ internal sealed class SettingsWindow : Window
                 case Categories.Keyboard:
                     FormInputs.AddSectionHeader("Keyboard Shortcuts");
                     CustomComponents.HelpText("The keyboard layout can't be edited yet. Working on it");
-
                     KeyMapEditor.DrawEditor();
-
                     break;
-                
                 case Categories.Profiling:
                 {
                     FormInputs.AddSectionHeader("Profiling and debugging");
-
-                    CustomComponents.HelpText("Enabling this will add slight performance overhead.\nChanges will require a restart of Tooll.");
                     FormInputs.AddVerticalSpace();
 
-                    FormInputs.SetIndentToParameters();
-                    FormInputs.AddSectionSubHeader("Log events");
+                    // Profiling group
                     FormInputs.SetIndentToLeft();
+                    FormInputs.AddSectionSubHeader("Profiling");
+                    FormInputs.AddVerticalSpace();
                     changed |= FormInputs.AddCheckBox("Enable Frame Profiling",
-                                                      ref UserSettings.Config.EnableFrameProfiling,
-                                                      "A basic frame profile for the duration of frame processing. Overhead is minimal.",
-                                                      UserSettings.Defaults.EnableFrameProfiling);
-                    
+                        ref UserSettings.Config.EnableFrameProfiling,
+                        "A basic frame profile for the duration of frame processing. Overhead is minimal.",
+                        UserSettings.Defaults.EnableFrameProfiling);
                     changed |= FormInputs.AddCheckBox("Keep Log Messages",
-                                                      ref UserSettings.Config.KeepTraceForLogMessages,
-                                                      "Store log messages in the profiling data. This can be useful to see correlation between frame drops and log messages.",
-                                                      UserSettings.Defaults.KeepTraceForLogMessages);
-
+                        ref UserSettings.Config.KeepTraceForLogMessages,
+                        "Store log messages in the profiling data. This can be useful to see correlation between frame drops and log messages.",
+                        UserSettings.Defaults.KeepTraceForLogMessages);
                     changed |= FormInputs.AddCheckBox("Log GC Profiling",
-                                                      ref UserSettings.Config.EnableGCProfiling,
-                                                      "Log garbage collection information. This can be useful to see correlation between frame drops and GC activity.",
-                                                      UserSettings.Defaults.EnableGCProfiling);
-                    
-                    changed |= FormInputs.AddCheckBox("Profile Beat Syncing",
-                                                      ref ProjectSettings.Config.EnableBeatSyncProfiling,
-                                                      "Logs beat sync timing to IO Window",
-                                                      ProjectSettings.Defaults.EnableBeatSyncProfiling);
+                        ref UserSettings.Config.EnableGCProfiling,
+                        "Log garbage collection information. This can be useful to see correlation between frame drops and GC activity.",
+                        UserSettings.Defaults.EnableGCProfiling);
+                    FormInputs.AddVerticalSpace();
 
-                    FormInputs.AddSectionSubHeader("Compilation");
-                    
-                    // Compilation details
+                    // MIDI Controller Debug Logging (from origin/main)
+                    changed |= FormInputs.AddCheckBox("MIDI Controller Debug Logging",
+                        ref UserSettings.Config.EnableMidiDebugLogging,
+                        "Log detailed MIDI controller messages including button mappings and mode switches. Useful for debugging custom controller implementations.",
+                        UserSettings.Defaults.EnableMidiDebugLogging);
+                    FormInputs.AddVerticalSpace();
+
+                    // Audio System group
+                    FormInputs.SetIndentToLeft();
+                    FormInputs.AddSectionSubHeader("Audio System");
+                    FormInputs.AddVerticalSpace();
+                    if (FormInputs.AddCheckBox("Show Audio Logs",
+                            ref UserSettings.Config.LogAudioDetails,
+                            "Shows Debug and Info log messages from audio system classes. Warning and Error messages will still be logged.",
+                            UserSettings.Defaults.LogAudioDetails))
                     {
-                        
-                        changed |= FormInputs.AddCheckBox("Log Assembly Version mismatches",
-                                                          ref ProjectSettings.Config.LogAssemblyVersionMismatches,
-                                                          """
-                                                          Version mismatches are frequently caused by slightly outdated 3rd party library that we depend on.
-                                                          These are only relevant in situations where you need to debug or analyse assembly loading problems. 
-                                                          """,
-                                                          ProjectSettings.Defaults.LogAssemblyVersionMismatches);                        
-                        
-                        changed |= FormInputs.AddCheckBox("Log Loading Details",
-                                                          ref ProjectSettings.Config.LogAssemblyLoadingDetails,
-                                                          """
-                                                          Logs additional details about resolving and identifying assemblies and other resources.
-                                                          This can be useful to debug issues related to loading projects.
-                                                          """,
-                                                          ProjectSettings.Defaults.LogAssemblyLoadingDetails);
-                        
-                        changed |= FormInputs.AddCheckBox("Log C# Compilation Details",
-                                                          ref ProjectSettings.Config.LogCompilationDetails,
-                                                          "Logs additional compilation details with the given severity",
-                                                          ProjectSettings.Defaults.LogCompilationDetails);
-                        
-             
+                        Log.Gated.AudioEnabled = UserSettings.Config.LogAudioDetails;
+                        changed = true;
+                    }
+                    changed |= FormInputs.AddCheckBox("Profile Beat Syncing",
+                        ref ProjectSettings.Config.EnableBeatSyncProfiling,
+                        "Logs beat sync timing to IO Window",
+                        ProjectSettings.Defaults.EnableBeatSyncProfiling);
+                    FormInputs.AddVerticalSpace();
 
-                        if (ProjectSettings.Config.LogCompilationDetails)
-                        {
-                            FormInputs.SetIndentToParameters();
-                            changed |= FormInputs.AddEnumDropdown(ref UserSettings.Config.CompileCsVerbosity,
-                                                                  "C# compiler logs",
-                                                                  null,
-                                                                  UserSettings.Defaults.CompileCsVerbosity
-                                                                 );
-                        }
+                    changed |= FormInputs.AddCheckBox("Log Asset File Events",
+                        ref ProjectSettings.Config.LogFileEvents,
+                        "Logs events related to changing and updating assets files.",
+                        ProjectSettings.Defaults.LogFileEvents);
+                    FormInputs.AddVerticalSpace();
 
+                    // Compilation group
+                    FormInputs.SetIndentToLeft();
+                    FormInputs.AddSectionSubHeader("Compilation");
+                    FormInputs.AddVerticalSpace();
+                    changed |= FormInputs.AddCheckBox("Log Assembly Version mismatches",
+                        ref ProjectSettings.Config.LogAssemblyVersionMismatches,
+                        "Version mismatches are frequently caused by slightly outdated 3rd party library that we depend on.\nThese are only relevant in situations where you need to debug or analyse assembly loading problems.",
+                        ProjectSettings.Defaults.LogAssemblyVersionMismatches);
+                    changed |= FormInputs.AddCheckBox("Log Loading Details",
+                        ref ProjectSettings.Config.LogAssemblyLoadingDetails,
+                        "Logs additional details about resolving and identifying assemblies and other resources.\nThis can be useful to debug issues related to loading projects.",
+                        ProjectSettings.Defaults.LogAssemblyLoadingDetails);
+                    changed |= FormInputs.AddCheckBox("Log C# Compilation Details",
+                        ref ProjectSettings.Config.LogCompilationDetails,
+                        "Logs additional compilation details with the given severity",
+                        ProjectSettings.Defaults.LogCompilationDetails);
+                    if (ProjectSettings.Config.LogCompilationDetails)
+                    {
+                        changed |= FormInputs.AddEnumDropdown(ref UserSettings.Config.CompileCsVerbosity,
+                            "C# compiler logs",
+                            null,
+                            UserSettings.Defaults.CompileCsVerbosity);
                     }
                     FormInputs.AddVerticalSpace();
+
+                    // Operator status indicator
                     FormInputs.SetIndentToLeft();
-                    
                     changed |= FormInputs.AddCheckBox("Show Operator status indicators",
-                                                      ref UserSettings.Config.ShowOperatorStats,
-                                                      """
-                                                      Draws an context overlay with various operator stats. 
-                                                      """,
-                                                      UserSettings.Defaults.ShowOperatorStats);
-
+                        ref UserSettings.Config.ShowOperatorStats,
+                        "Draws an context overlay with various operator stats.",
+                        UserSettings.Defaults.ShowOperatorStats);
                     FormInputs.AddVerticalSpace();
+                    FormInputs.SetIndentToLeft();
+                    FormInputs.AddSectionSubHeader("Rendering");
+                    // Add Show Audio Render Logs here
+                    var audioRenderingDebugChanged = FormInputs.AddCheckBox("Show Audio Render Logs",
+                        ref UserSettings.Config.LogAudioRenderingDetails,
+                        "Shows Debug and Info log messages from audio rendering classes (e.g., export, offline rendering).",
+                        UserSettings.Defaults.LogAudioRenderingDetails);
+                    if (audioRenderingDebugChanged)
+                    {
+                        Log.Gated.AudioRenderEnabled = UserSettings.Config.LogAudioRenderingDetails;
+                        changed = true;
+                    }
                     
-
                     
-
+                    // Change label for video rendering logs
+                    var videoRenderingDebugChanged = FormInputs.AddCheckBox("Show Video Render Logs",
+                        ref UserSettings.Config.LogVideoRenderingDetails,
+                        "Shows Debug and Info log messages from video rendering/export (e.g., Mp4VideoWriter, RenderProcess).",
+                        UserSettings.Defaults.LogVideoRenderingDetails);
+                    if (videoRenderingDebugChanged)
+                    {
+                        Log.Gated.VideoRenderEnabled = UserSettings.Config.LogVideoRenderingDetails;
+                        changed = true;
+                    }
+                    FormInputs.AddVerticalSpace();
                     break;
                 }
             }
 
             if (changed)
                 UserSettings.Save();
+            
+            if (projectSettingsChanged)
+                ProjectSettings.Save();
         }
         ImGui.EndChild();
         ImGui.PopStyleVar();
@@ -534,3 +591,4 @@ internal sealed class SettingsWindow : Window
         return new List<Window>();
     }
 }
+

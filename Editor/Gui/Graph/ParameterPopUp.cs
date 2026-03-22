@@ -15,7 +15,7 @@ using T3.Editor.UiModel.Commands;
 using T3.Editor.UiModel.Commands.Graph;
 using T3.Editor.UiModel.ProjectHandling;
 
-namespace T3.Editor.Gui.Graph;
+namespace T3.Editor.Gui;
 
 internal static class ParameterPopUp
 {
@@ -128,8 +128,6 @@ internal static class ParameterPopUp
                 ImGui.SetCursorPos( new Vector2(5,5));
                 CustomComponents.AddSegmentedIconButton(ref _viewMode, _modeIcons);
                 ImGui.SameLine();
-                
-                ImGui.GetWindowDrawList().AddCircle(ImGui.GetCursorScreenPos(), 30, UiColors.BackgroundActive);
                 
                 var spaceBetweenViewIconsAndActions = ImGui.GetContentRegionAvail().X 
                                                       - 3 * (ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.X);

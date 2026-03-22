@@ -1,6 +1,6 @@
 #nullable enable
 using ImGuiNET;
-using T3.Editor.Gui.Graph.Window;
+using T3.Editor.Gui.Window;
 using T3.Editor.Gui.Interaction;
 using T3.Editor.Gui.Interaction.Keyboard;
 using T3.Editor.Gui.UiHelpers;
@@ -36,6 +36,9 @@ internal static partial class WindowManager
             windowType.Draw();
         }
 
+        // Draw SNiXL window separately (easter egg - not in main windows list)
+        SnixlWindow.Draw();
+
         if (DemoWindowVisible)
             ImGui.ShowDemoWindow(ref DemoWindowVisible);
 
@@ -45,22 +48,25 @@ internal static partial class WindowManager
 
     internal static readonly SettingsWindow SettingsWindow = new();
     internal static readonly UtilitiesWindow UtilitiesWindow = new();
-    
+    internal static readonly ScreenManagerWindow ScreenManagerWindow = new();
+    internal static readonly SnixlWindow SnixlWindow = new();
+
 
     private static void TryToInitialize()
     {
         // Wait first frame for ImGUI to initialize
-        if (ImGui.GetTime() > 0.2f || _hasBeenInitialized)
+        var frameCount = ImGui.GetFrameCount();
+        if (frameCount < 2 || _hasBeenInitialized)
             return;
         
         _windows =
             [
+                new VariationsWindow(),
                 new OutputWindow(),
                 new GraphWindow(),
                 new ParameterWindow(),
                 new SymbolLibrary(),
                 new AssetLibrary(),
-                new VariationsWindow(),
                 new ExplorationWindow(),
                 new RenderWindow(),
                 new IoViewWindow(),
@@ -68,6 +74,7 @@ internal static partial class WindowManager
                 Program.ConsoleLogWindow,
                 UtilitiesWindow,    // item shown in TiXL > Development menu
                 SettingsWindow, // item shown in TiXL menu
+                ScreenManagerWindow,
             ];
 
 
@@ -78,7 +85,7 @@ internal static partial class WindowManager
 
     private static void ReApplyLayout()
     {
-        LayoutHandling.LoadAndApplyLayoutOrFocusMode(UserSettings.Config.WindowLayoutIndex);
+        LayoutHandling.LoadAndApplyLayoutOrFocusMode((LayoutHandling.Layouts)UserSettings.Config.WindowLayoutIndex);
     }
 
     internal static IEnumerable<Window> GetAllWindows()
@@ -134,7 +141,7 @@ internal static partial class WindowManager
         LayoutHandling.UpdateAfterResize(newSize);
     }
 
-    private static void ToggleWindowTypeVisibility<T>() where T : Window
+    public static void ToggleWindowTypeVisibility<T>() where T : Window
     {
         var instances = GetAllWindows().OfType<T>().ToList();
         if (instances.Count != 1)
@@ -153,6 +160,6 @@ internal static partial class WindowManager
     /// </summary>
     private static List<Window> _windows = [];
     
-    public static bool ShowSecondaryRenderWindow { get; private set; }
+    public static bool ShowSecondaryRenderWindow { get; set; }
     private static bool _hasBeenInitialized;
 }

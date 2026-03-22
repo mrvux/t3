@@ -1,21 +1,21 @@
-﻿using System.IO;
+#nullable enable
+
+using System.IO;
 using ImGuiNET;
 using Newtonsoft.Json;
 using T3.Core.UserData;
-using T3.Editor.Gui.Graph.Window;
+using T3.Editor.Gui.Window;
 using T3.Editor.Gui.Interaction;
 using T3.Editor.Gui.Interaction.Keyboard;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.Gui.Windows.Output;
-
-#nullable enable
 
 namespace T3.Editor.Gui.Windows.Layouts;
 
 /// <summary>
 /// Manages visibility and layout of windows including...
 /// - switching between Layouts
-/// - toggling visibility from main menu
+/// - toggling visibility from the main menu
 /// - Graph over content mode
 /// </summary>    
 internal static class LayoutHandling
@@ -25,11 +25,17 @@ internal static class LayoutHandling
         // Process Keyboard shortcuts
         for (var i = 0; i < _saveLayoutActions.Length; i++)
         {
-            if (KeyActionHandling.Triggered(_saveLayoutActions[i]))
+            if (_saveLayoutActions[i].Triggered())
+            {
                 SaveLayout(i);
+                break;
+            }
 
-            if (KeyActionHandling.Triggered(_loadLayoutActions[i]))
-                LoadAndApplyLayoutOrFocusMode(i);
+            if (_loadLayoutActions[i].Triggered())
+            {
+                LoadAndApplyLayoutOrFocusMode((Layouts)i);
+                break;
+            }
         }
     }
 
@@ -41,7 +47,7 @@ internal static class LayoutHandling
             {
                 if (ImGui.MenuItem("Layout " + (i + 1), "F" + (i + 1), false, enabled: DoesLayoutExists(i)))
                 {
-                    LoadAndApplyLayoutOrFocusMode(i);
+                    LoadAndApplyLayoutOrFocusMode((Layouts)i);
                 }
             }
 
@@ -78,6 +84,43 @@ internal static class LayoutHandling
                                            .Where(config => config != null)
                                            .ToList()
                         });
+    }
+
+    public static void LoadAndApplyLayoutOrFocusMode(Layouts layoutId)
+    {
+        var index = (int)layoutId;
+
+        var relativePath = Path.Combine(LayoutSubfolder, GetLayoutFilename(index));
+        if (!UserData.TryLoadingOrWriteDefaults(relativePath, out var jsonBlob))
+            return;
+
+        var serializer = JsonSerializer.Create();
+        var fileTextReader = new StringReader(jsonBlob);
+        if (serializer.Deserialize(fileTextReader, typeof(Layout)) is not Layout layout)
+        {
+            Log.Error("Can't load layout");
+            return;
+        }
+
+        var switchingBackFromFocusMode = layoutId != Layouts.FocusMode && UserSettings.Config.FocusMode;
+        if (switchingBackFromFocusMode)
+        {
+            UiConfig.RestoreUiVisibilityAfterFocusMode();
+        }
+        
+        if(layoutId != Layouts.FocusMode) 
+        {
+            UserSettings.Config.WindowLayoutIndex = index;
+        }
+
+        ApplyLayout(layout);
+        foreach (var graphWindow in GraphWindow.GraphWindowInstances)
+        {
+            graphWindow.SetWindowToNormal();
+        }
+
+        // var isFocusMode = layoutId == Layouts.FocusMode;
+        // UserSettings.Config.FocusMode = isFocusMode;
     }
 
     public static string GraphPrefix => "Graph View##";
@@ -138,6 +181,9 @@ internal static class LayoutHandling
         {
             Program.NewImGuiLayoutDefinition = layout.ImGuiSettings;
         }
+
+        ChangeCounter++;
+        //UiConfig.RestoreUiVisibilityAfterFocusMode();
     }
 
     private static void SaveLayout(int index)
@@ -157,36 +203,6 @@ internal static class LayoutHandling
 
         serializer.Serialize(file, layout);
         UserSettings.Config.WindowLayoutIndex = index;
-    }
-
-    public static void LoadAndApplyLayoutOrFocusMode(int index)
-    {
-        var isFocusMode = index == 11;
-
-        var relativePath = Path.Combine(LayoutSubfolder, GetLayoutFilename(index));
-        if (!UserData.TryLoadingOrWriteDefaults(relativePath, out var jsonBlob))
-            return;
-
-        var serializer = JsonSerializer.Create();
-        var fileTextReader = new StringReader(jsonBlob);
-        if (serializer.Deserialize(fileTextReader, typeof(Layout)) is not Layout layout)
-        {
-            Log.Error("Can't load layout");
-            return;
-        }
-
-        ApplyLayout(layout);
-        foreach (var graphWindow in GraphWindow.GraphWindowInstances)
-        {
-            graphWindow.SetWindowToNormal();
-        }
-
-        if (!isFocusMode)
-        {
-            UserSettings.Config.WindowLayoutIndex = index;
-        }
-
-        UserSettings.Config.FocusMode = isFocusMode;
     }
 
     private static string GetLayoutFilename(int index)
@@ -227,6 +243,22 @@ internal static class LayoutHandling
             UserActions.SaveLayout9,
         };
 
+    public enum Layouts
+    {
+        Custom0 = 0,
+        Custom1 = 1,
+        Custom2 = 2,
+        Custom3 = 3,
+        Custom4 = 4,
+        Custom5 = 5,
+        Custom6 = 6,
+        Custom7 = 7,
+        Custom8 = 8,
+        Custom9 = 9,
+        FocusMode = 11,
+        SkillQuest = 12,
+    }
+
     /// <summary>
     /// Defines a layout that can be then serialized to file  
     /// </summary>
@@ -239,4 +271,5 @@ internal static class LayoutHandling
     private const string LayoutFileNameFormat = "layout{0}.json";
     private static string LayoutSubfolder => "Layouts";
     public static string LayoutFolder => Path.Combine(FileLocations.SettingsDirectory, LayoutSubfolder);
+    public static int ChangeCounter { get; private set; }
 }

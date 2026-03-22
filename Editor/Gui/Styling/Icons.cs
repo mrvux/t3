@@ -48,6 +48,22 @@ internal static class Icons
                           color);
     }
 
+    public static void DrawIconAtScreenPosition(Icon icon,
+                                                Vector2 screenPos,
+                                                Vector2 size,
+                                                ImDrawListPtr drawList,
+                                                Color color)
+    {
+        GetGlyphDefinition(icon, out var uvRange, out _);
+        drawList.AddImage(ImGui.GetIO().Fonts.TexID,
+                          screenPos,
+                          screenPos + size,
+                          uvRange.Min,
+                          uvRange.Max,
+                          color);
+    }
+    
+    
     public static void DrawIconOnLastItem(Icon icon, Color color, float alignment = 0.5f)
     {
         var pos = ImGui.GetItemRectMin();
@@ -245,6 +261,7 @@ internal static class Icons
             new(Icon.FileGeometry, slotIndex: 113),
             new(Icon.FileShader, slotIndex: 114),
             new(Icon.FileT3Font, slotIndex: 115),
+            new(Icon.FileVector, slotIndex: 116),
             // Intentionally left black
             new(Icon.FileDocument, slotIndex: 117),
             new(Icon.ScrollLog, slotIndex: 118),
@@ -257,16 +274,30 @@ internal static class Icons
             new(Icon.RotateCounterClockwise, slotIndex: 125),
             new(Icon.RotateClockwise, slotIndex: 126),
             new(Icon.Stack, slotIndex: 127),
+            new(Icon.Exit, slotIndex: 128),
+            new(Icon.Star, slotIndex: 129),
+            new(Icon.Locked, slotIndex: 130),
+            new(Icon.Unlocked, slotIndex: 131),
+            new(Icon.Usb, slotIndex: 132),
+            new(Icon.ArrowLeft, slotIndex: 133),
+            new(Icon.ArrowRight, slotIndex: 134),
+            new(Icon.ArrowUp, slotIndex: 135),
+            new(Icon.ArrowDown, slotIndex: 136),
+            new(Icon.ApplySelection, slotIndex: 137),
+            new(Icon.PasteFromClipboard, slotIndex: 138),
+            new(Icon.Cross, slotIndex: 139),
+            new(Icon.BackUp, slotIndex: 140),
+            new(Icon.Sleeping, slotIndex: 141),
         };
 
-    public static readonly string IconAtlasPath = Path.Combine(SharedResources.Directory, @"images\editor\t3-icons.png");
+    public static readonly string IconAtlasPath = Path.Combine(SharedResources.EditorResourcesDirectory, @"images/t3-icons.png");
 
     public static readonly Dictionary<float, string> IconFilePathForResolutions
         = new()
               {
-                  { 1f, Path.Combine(SharedResources.Directory, @"images\editor\t3-icons.png") },
-                  { 2f, Path.Combine(SharedResources.Directory, @"images\editor\t3-icons@2x.png") },
-                  { 3f, Path.Combine(SharedResources.Directory, @"images\editor\t3-icons@3x.png") },
+                  { 1f, Path.Combine(SharedResources.EditorResourcesDirectory, @"images/t3-icons.png") },
+                  { 2f, Path.Combine(SharedResources.EditorResourcesDirectory, @"images/t3-icons@2x.png") },
+                  { 3f, Path.Combine(SharedResources.EditorResourcesDirectory, @"images/t3-icons@3x.png") },
               };
 }
 
@@ -383,6 +414,7 @@ public enum Icon
     FileGeometry,
     FileShader,
     FileT3Font,
+    FileVector,
     ScrollLog,
     ClearLog,
     CopyToClipboard,
@@ -398,5 +430,19 @@ public enum Icon
     CameraSpeed,
     RenderAnimation,
     TixlLogo,
-    OpenExternally
+    OpenExternally,
+    Exit,
+    Star,
+    Locked,
+    Unlocked,
+    Usb,
+    ArrowLeft,
+    ArrowRight,
+    ArrowUp,
+    ArrowDown,
+    ApplySelection,
+    PasteFromClipboard,
+    Cross,
+    BackUp,
+    Sleeping
 }

@@ -4,7 +4,7 @@ using System.Diagnostics;
 using ImGuiNET;
 using T3.Core.DataTypes.Vector;
 using T3.Core.Operator;
-using T3.Editor.Gui.Graph.Interaction;
+using T3.Editor.Gui.Interaction;
 using T3.Editor.Gui.Interaction.Snapping;
 using T3.Editor.Gui.MagGraph.Model;
 using T3.Editor.Gui.MagGraph.States;
@@ -17,6 +17,7 @@ using T3.Editor.UiModel.InputsAndTypes;
 using T3.Editor.UiModel.Modification;
 using T3.Editor.UiModel.ProjectHandling;
 using T3.Editor.UiModel.Selection;
+using MagGraphView = T3.Editor.Gui.MagGraph.Ui.MagGraphView;
 using Vector2 = System.Numerics.Vector2;
 
 // ReSharper disable ForeachCanBePartlyConvertedToQueryUsingAnotherGetEnumerator
@@ -25,7 +26,7 @@ using Vector2 = System.Numerics.Vector2;
 namespace T3.Editor.Gui.MagGraph.Interaction;
 
 /// <summary>
-/// Provides functions for moving, snapping, connecting, insertion etc. of operators. It controlled by the <see cref="StateMachine"/>
+/// Provides functions for moving, snapping, connecting, insertion etc. of operators. It controlled by the <see cref="StateMachine{T}"/>
 /// </summary>
 /// <remarks>
 /// Things would be slightly more efficient if this would would use SnapGraphItems. However this would
@@ -209,6 +210,7 @@ internal sealed partial class MagItemMovement
         }
 
         var overlappingItems = new List<MagGraphItem>();
+        
         foreach (var otherItem in _layout.Items.Values)
         {
             if (DraggedItems.Contains(otherItem) || !dragExtend.Overlaps(otherItem.Area))
@@ -223,6 +225,19 @@ internal sealed partial class MagItemMovement
             n.PosOnCanvas -= _lastAppliedOffset; // Move to position
             n.PosOnCanvas += requestedDeltaOnCanvas; // Move to request position
         }
+
+        if (DraggedItems.Count != _context.Selector.Selection.Count)
+        {
+            foreach (var a in _context.Selector.Selection)
+            {
+                if (a is not Annotation)
+                    continue;
+                
+                a.PosOnCanvas -= _lastAppliedOffset; // Move to position
+                a.PosOnCanvas += requestedDeltaOnCanvas; // Move to request position
+            }
+        }
+        
 
         _lastAppliedOffset = requestedDeltaOnCanvas;
         _snapping.Reset();

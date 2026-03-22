@@ -1,5 +1,6 @@
-using System.Diagnostics;
 using ImGuiNET;
+using System.Diagnostics;
+using SharpDX.Direct3D11;
 using T3.Core.DataTypes.Vector;
 using T3.Core.Model;
 using T3.Core.Operator;
@@ -7,13 +8,15 @@ using T3.Core.Operator.Interfaces;
 using T3.Core.Operator.Slots;
 using T3.Core.Resource;
 using T3.Core.Utils;
-using T3.Editor.Gui.OpUis;
-using T3.Editor.Gui.Graph;
+using T3.Editor.Gui;
 using T3.Editor.Gui.MagGraph.Interaction;
 using T3.Editor.Gui.MagGraph.Model;
 using T3.Editor.Gui.MagGraph.States;
+using T3.Editor.Gui.OpUis;
 using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
+using T3.Editor.Gui.UiHelpers.Thumbnails;
+using T3.Editor.UiModel.Helpers;
 using T3.Editor.UiModel.InputsAndTypes;
 using Texture2D = T3.Core.DataTypes.Texture2D;
 
@@ -27,6 +30,9 @@ internal sealed partial class MagGraphView
             return;
 
         if (!IsRectVisible(item.Area))
+            return;
+
+        if (item.ChildUi != null && item.ChildUi.CollapsedIntoAnnotationFrameId != Guid.Empty)
             return;
 
         var idleFadeFactor = 1f;
@@ -269,6 +275,8 @@ internal sealed partial class MagGraphView
             }
         }
 
+        var hasHiddenMatchingTypes = false;
+
         // Indicate hidden matching inputs...
         if (_context.DraggedPrimaryOutputType != null
             && item.Variant == MagGraphItem.Variants.Operator
@@ -278,7 +286,7 @@ internal sealed partial class MagGraphView
         {
             Debug.Assert(item.Instance != null); // should be true to operator variant
 
-            var hasMatchingTypes = false;
+            //hasHiddenMatchingTypes = true;
             for (var inputIndex = 0; inputIndex < item.Instance.Inputs.Count; inputIndex++)
             {
                 var inputSlot = item.Instance.Inputs[inputIndex];
@@ -286,12 +294,12 @@ internal sealed partial class MagGraphView
                 if (inputSlot.ValueType == _context.DraggedPrimaryOutputType
                     && !inputSlot.HasInputConnections)
                 {
-                    hasMatchingTypes = true;
+                    hasHiddenMatchingTypes = true;
                     break;
                 }
             }
 
-            if (hasMatchingTypes && item != _context.ActiveItem)
+            if (hasHiddenMatchingTypes && item != _context.ActiveItem)
             {
                 var indicatorPos = new Vector2(pMinVisible.X + 5 * CanvasScale, pMaxVisible.Y - 5 * CanvasScale);
 
@@ -539,20 +547,20 @@ internal sealed partial class MagGraphView
             var indicatorCount = 0;
             if (item.Instance.Parent.Symbol.Animator.IsInstanceAnimated(item.Instance))
             {
-                DrawIndicator(drawList, UiColors.StatusAnimated, idleFadeFactor, pMin, pMax, CanvasScale, ref indicatorCount);
+                DrawIndicator(drawList, UiColors.StatusAnimated, idleFadeFactor, pMin, pMax, CanvasScale, ref indicatorCount, "is animated");
             }
 
             // Pinned indicator
             if (context.Selector.PinnedIds.Contains(item.Instance.SymbolChildId))
             {
-                DrawIndicator(drawList, UiColors.Selection, idleFadeFactor, pMin, pMax, CanvasScale, ref indicatorCount);
+                DrawIndicator(drawList, UiColors.Selection, idleFadeFactor, pMin, pMax, CanvasScale, ref indicatorCount, "is pinned");
             }
 
             // Snapshot indicator
             {
                 if (item.ChildUi.EnabledForSnapshots)
                 {
-                    DrawIndicator(drawList, UiColors.StatusAutomated, idleFadeFactor, pMin, pMax, CanvasScale, ref indicatorCount);
+                    DrawIndicator(drawList, UiColors.StatusAutomated, idleFadeFactor, pMin, pMax, CanvasScale, ref indicatorCount, "enabled for snapshot");
                 }
             }
 
@@ -585,6 +593,15 @@ internal sealed partial class MagGraphView
                 Icons.DrawIconOnLastItem(Icon.Comment, UiColors.ForegroundFull);
                 CustomComponents.TooltipForLastItem(UiColors.Text, item.ChildUi.Comment, null, false);
             }
+
+            // Non-Lib indicator 
+            var isNonLib = !SymbolAnalysis.TryGetOperatorType(item.Instance.Symbol, out var operatorType);
+
+            if (isNonLib)
+            {
+                  DrawIndicator(drawList, UiColors.StatusControlled, idleFadeFactor, pMin, pMax, CanvasScale, ref indicatorCount, "is a custom symbol");
+            }
+
         }
 
         // Hide additional UI elements when custom ui-op is hovered with control
@@ -773,7 +790,15 @@ internal sealed partial class MagGraphView
                     if (isPotentialConnectionEndDropTarget && item != _context.ActiveItem)
                     {
                         fillColor = ColorVariations.Highlight.Apply(type2UiProperties.Color).Fade(Blink);
-                        InputSnapper.RegisterAsPotentialTargetInput(item, center, inputAnchor.SlotId);
+                        var mousePos = ImGui.GetMousePos();
+                        var isHovered = new ImRect(pMin + new Vector2(4 * CanvasScale,0), pMax).Contains(mousePos);
+                        var preventInsideSnapping = isHovered && hasHiddenMatchingTypes;
+                        
+                        if (!preventInsideSnapping)
+                        {
+                            InputSnapper.RegisterAsPotentialTargetInput(item, center, inputAnchor.SlotId);
+                        } 
+                        
                     }
                     else if (inputAnchor.InputLine.ConnectionIn != null)
                     {
@@ -1130,7 +1155,7 @@ internal sealed partial class MagGraphView
     }
 
     private static void DrawIndicator(ImDrawListPtr drawList, Color color, float opacity, Vector2 areaMin, Vector2 areaMax, float canvasScale,
-                                      ref int indicatorCount)
+                                      ref int indicatorCount, string tooltip=null)
     {
         const int s = 4;
         var dx = (s + 1) * indicatorCount;
@@ -1145,7 +1170,18 @@ internal sealed partial class MagGraphView
         drawList.AddRect(pMin - Vector2.One,
                          pMax + Vector2.One,
                          UiColors.WindowBackground.Fade(0.4f * opacity));
-        indicatorCount++;
+        if (!string.IsNullOrEmpty(tooltip)&&canvasScale>2.0f)
+        {
+            var mousePos = ImGui.GetMousePos();
+            var area= new ImRect(pMin, pMax);
+            if (area.Contains(mousePos))
+            {
+                ImGui.BeginTooltip();
+                ImGui.TextUnformatted(tooltip);
+                ImGui.EndTooltip();
+            }
+        }
+            indicatorCount++;
     }
     
 
@@ -1162,14 +1198,30 @@ internal sealed partial class MagGraphView
         if (firstOutput is not Slot<Texture2D> textureSlot)
             return false;
 
+        ShaderResourceView previewTextureView;
+        float aspect = 1;
+        
         var texture = textureSlot.Value;
-        if (texture == null || texture.IsDisposed)
-            return false;
+        var uvMin = Vector2.Zero;
+        var uvMax = Vector2.One;
+        
+        if (texture != null && !texture.IsDisposed)
+        {
+            previewTextureView = SrvManager.GetSrvForTexture(texture);
+            aspect = (float)texture.Description.Width / texture.Description.Height;
+        }
+        else
+        {
+            var thumbnail = ThumbnailManager.GetThumbnail(instance.Symbol.Id, instance.Symbol.SymbolPackage, ThumbnailManager.Categories.PackageMeta);
+            if(!thumbnail.IsReady)
+                return false;
 
-        var previewTextureView = SrvManager.GetSrvForTexture(texture);
-
-        var aspect = (float)texture.Description.Width / texture.Description.Height;
-
+            previewTextureView = ThumbnailManager.AtlasSrv;
+            uvMin = thumbnail.UvMin;
+            uvMax = thumbnail.UvMax;
+            aspect = 4 / 3.0f;
+        }
+        
         var unitScreenHeight = (MagGraphItem.GridSize.Y - 5) * CanvasScale;
         var previewSize = new Vector2(unitScreenHeight * aspect, unitScreenHeight);
 
@@ -1189,8 +1241,8 @@ internal sealed partial class MagGraphView
 
         drawList.AddImage((IntPtr)previewTextureView, min,
                           min + previewSize,
-                          Vector2.Zero,
-                          Vector2.One,
+                          uvMin,
+                          uvMax,
                           Color.White);
         if (CanvasScale > 0.5f)
         {

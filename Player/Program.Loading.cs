@@ -20,21 +20,27 @@ internal static partial class Program
 {
     private static void LoadOperators()
     {
-        var searchDirectory = Path.Combine(FileLocations.StartFolder, "Operators");
+        var searchDirectory = Path.Combine(FileLocations.StartFolder, FileLocations.OperatorsSubFolder);
         Log.Info($"Loading operators from \"{searchDirectory}\"...");
 
         var assemblies = Directory.GetDirectories(searchDirectory, "*", SearchOption.TopDirectoryOnly)
                                   .Select(packageDir =>
-                                              {
-                                                  Log.Debug($"Searching for dlls in {packageDir}...");
-                                                  return new AssemblyInformation(packageDir);
-                                              })
+                                          {
+                                              var releaseInfoPath = Path.Combine(packageDir, ReleaseInfo.FileName);
+                                              var assetsOnlyPath = !File.Exists(releaseInfoPath);
+                                              if (assetsOnlyPath)
+                                                  return null;
+                                              
+                                              var assemblyInformation = new AssemblyInformation(packageDir);
+                                              Log.Debug($"Searching for dlls in {packageDir}...");
+                                              return assemblyInformation; 
+                                          })
                                   .Where(x => x != null)
                                   .ToArray();
         
         Log.Debug($"Finished loading {assemblies.Length} operator assemblies. Loading symbols...");
         var packageLoadInfo = assemblies
-                             .AsParallel()
+                             //.AsParallel()
                              .Select(assemblyInfo =>
                                      {
                                          var symbolPackage = new PlayerSymbolPackage(assemblyInfo);
@@ -71,7 +77,7 @@ internal static partial class Program
             Log.Info($"Pre-evaluate at: {timeInSecs:0.00}s / {playback.TimeInBars:0.00} bars");
 
             DirtyFlag.IncrementGlobalTicks();
-            DirtyFlag.InvalidationRefFrame++;
+            DirtyFlag.GlobalInvalidationTick++;
 
             rasterizer.SetViewport(new Viewport(0, 0, resolution.Width, resolution.Height, 0.0f, 1.0f));
             merger.SetTargets(renderView);
@@ -81,7 +87,7 @@ internal static partial class Program
 
             if (hasTextureOutput)
             {
-                textureOutput.Invalidate();
+                textureOutput.InvalidateGraph();
                 textureOutput.GetValue(context); // why is this done twice?
 
                 if (textureOutput.GetValue(context) == null)

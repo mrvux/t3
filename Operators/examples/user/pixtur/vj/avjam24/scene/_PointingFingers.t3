@@ -420,7 +420,7 @@
       "Outputs": []
     },
     {
-      "Id": "4d1d8550-1d87-4749-8856-fd940b4fae49"/*PickFromStringList*/,
+      "Id": "4d1d8550-1d87-4749-8856-fd940b4fae49"/*PickStringFromList*/,
       "SymbolId": "ef357e66-24e9-4f54-8d86-869db74602f4",
       "InputValues": [],
       "Outputs": []
@@ -582,11 +582,6 @@
       "Id": "a49b9f42-31ea-4aed-a4db-5e99f48a1415"/*FilesInFolder*/,
       "SymbolId": "f90fcd0a-eab9-4e2a-b393-e8d3a0380823",
       "InputValues": [
-        {
-          "Id": "ca9778e7-072c-4304-9043-eeb2dc4ca5d7"/*Folder*/,
-          "Type": "System.String",
-          "Value": "Resources\\Example\\user\\pixtur\\VJ\\Faces\\PointingFingers"
-        },
         {
           "Id": "e14a4aae-e253-4d14-80ef-a90271cd306a"/*TriggerUpdate*/,
           "Type": "System.Boolean",
@@ -826,7 +821,7 @@
           "Value": false
         },
         {
-          "Id": "a7350ba8-08be-4afc-92f1-d223ee9bcbeb"/*SetFx1To*/,
+          "Id": "a7350ba8-08be-4afc-92f1-d223ee9bcbeb"/*SetF1To*/,
           "Type": "System.Int32",
           "Value": 1
         },

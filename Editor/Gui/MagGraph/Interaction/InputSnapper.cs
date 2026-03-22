@@ -6,6 +6,7 @@ using T3.Core.Operator;
 using T3.Editor.Gui.MagGraph.Model;
 using T3.Editor.Gui.MagGraph.States;
 using T3.Editor.UiModel.Commands.Graph;
+using T3.Editor.UiModel.InputsAndTypes;
 using T3.Editor.UiModel.ProjectHandling;
 using Vector2 = System.Numerics.Vector2;
 
@@ -34,8 +35,9 @@ internal static class InputSnapper
     public static void RegisterAsPotentialTargetInput(MagGraphItem item, Vector2 posOnScreen, Guid slotId,
                                                       InputSnapTypes inputSnapType = InputSnapTypes.Normal, int multiInputIndex = 0)
     {
-        var distance = Vector2.Distance(posOnScreen, ImGui.GetMousePos());
-        if (distance < _bestInputMatchForCurrentFrame.Distance)
+        var mousePos = ImGui.GetMousePos();
+        var distance = Vector2.Distance(posOnScreen, mousePos);
+        if ( distance < _bestInputMatchForCurrentFrame.Distance)
         {
             _bestInputMatchForCurrentFrame = new InputMatch(item, slotId, posOnScreen, inputSnapType, multiInputIndex, distance);
         }
@@ -122,7 +124,11 @@ internal static class InputSnapper
 
             var hasHeightChanged = (BestInputMatch.InputSnapType == InputSnapTypes.InsertAfterMultiInput ||
                                     BestInputMatch.InputSnapType == InputSnapTypes.InsertBeforeMultiInput)
-                                   || (BestInputMatch.InputSnapType == InputSnapTypes.Normal && !wasInputLineWasConnected && inputLineIndex > 0);
+                                   || (BestInputMatch.InputSnapType == InputSnapTypes.Normal 
+                                       && !wasInputLineWasConnected 
+                                       && BestInputMatch.Item.Variant == MagGraphItem.Variants.Operator 
+                                       && lines[inputLineIndex].InputUi.Relevancy == Relevancy.Optional
+                                       && inputLineIndex > 0);
             
             if (  hasHeightChanged && inputLineIndex < lines.Length)
             {

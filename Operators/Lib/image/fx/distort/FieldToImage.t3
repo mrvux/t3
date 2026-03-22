@@ -10,6 +10,10 @@
       "DefaultValue": "R16G16B16A16_Float"
     },
     {
+      "Id": "5439b7d1-263d-44e6-8eb5-cc9d0df4a61a"/*SliceDepth*/,
+      "DefaultValue": 0.0
+    },
+    {
       "Id": "5573ae7b-b699-42c5-84ac-2485040e9a55"/*GenerateMips*/,
       "DefaultValue": false
     },
@@ -47,7 +51,7 @@
       "DefaultValue": 0
     },
     {
-      "Id": "d99d1e27-caba-4a9a-b689-8c965b9af89e"/*Grandient*/,
+      "Id": "d99d1e27-caba-4a9a-b689-8c965b9af89e"/*Gradient*/,
       "DefaultValue": {
         "Gradient": {
           "Interpolation": "Linear",
@@ -176,7 +180,7 @@
         {
           "Id": "0b5cbbdf-afe7-4daf-9f1e-0e79792691f1"/*TemplateFilePath*/,
           "Type": "System.String",
-          "Value": "lib/img/generate/FieldToImageTemplate.hlsl"
+          "Value": "Lib:shaders/img/generate/FieldToImageTemplate.hlsl"
         },
         {
           "Id": "f6fb3be8-53f2-4d68-bf0f-3f519bc09ff4"/*AdditionalDefines*/,
@@ -286,7 +290,7 @@
         {
           "Id": "78fb7501-74d9-4a27-8db2-596f25482c87"/*Source*/,
           "Type": "System.String",
-          "Value": "Resources/lib/img/fx/Default2-vs.hlsl"
+          "Value": "Lib:shaders/img/fx/Default2-vs.hlsl"
         },
         {
           "Id": "9a8b500e-c3b1-4be1-8270-202ef3f90793"/*EntryPoint*/,
@@ -372,23 +376,6 @@
       "Id": "f0db4fc4-365f-44e1-b259-38153c9d40f2"/*Rasterizer*/,
       "SymbolId": "fbd7f0f0-36a3-4fbb-91e1-cb33d4666d09",
       "InputValues": [],
-      "Outputs": []
-    },
-    {
-      "Id": "f94045f5-e21a-40cd-915a-807f2295e37e"/*ReadFile*/,
-      "SymbolId": "5f71d2f8-98c8-4502-8f40-2ea4a1e18cca",
-      "InputValues": [
-        {
-          "Id": "24b7e7e1-fe0b-46be-807e-0afacd4800f9"/*FilePath*/,
-          "Type": "System.String",
-          "Value": "lib/img/generate/FieldToImageTemplate.hlsl"
-        },
-        {
-          "Id": "5c6241f7-6a4f-4972-a314-98fd070f91dd"/*TriggerUpdate*/,
-          "Type": "System.Boolean",
-          "Value": false
-        }
-      ],
       "Outputs": []
     }
   ],
@@ -606,6 +593,12 @@
     {
       "SourceParentOrChildId": "c68a9c6a-8635-46d2-b1e3-cd3b70a051e6",
       "SourceSlotId": "305d321d-3334-476a-9fa3-4847912a4c58",
+      "TargetParentOrChildId": "c8bb6b2d-bb10-4a36-9a2d-28013a6728e6",
+      "TargetSlotId": "49556d12-4cd1-4341-b9d8-c356668d296c"
+    },
+    {
+      "SourceParentOrChildId": "00000000-0000-0000-0000-000000000000",
+      "SourceSlotId": "5439b7d1-263d-44e6-8eb5-cc9d0df4a61a",
       "TargetParentOrChildId": "c8bb6b2d-bb10-4a36-9a2d-28013a6728e6",
       "TargetSlotId": "49556d12-4cd1-4341-b9d8-c356668d296c"
     },

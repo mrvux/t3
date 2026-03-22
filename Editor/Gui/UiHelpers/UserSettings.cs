@@ -3,23 +3,33 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using T3.Core.Animation;
 using T3.Core.IO;
+using T3.Core.Logging;
 using T3.Core.UserData;
 using T3.Editor.Compilation;
 using T3.Editor.Gui.Windows;
 using T3.Editor.Gui.Windows.TimeLine;
-
-// ReSharper disable MemberCanBeInternal
 
 namespace T3.Editor.Gui.UiHelpers;
 
 /// <summary>
 /// Saves view layout, currently open node and other user settings 
 /// </summary>
-///  todo - make internal, make extendable by external packaages
+///  todo - make internal, make extendable by external packages
 public sealed class UserSettings : Settings<UserSettings.ConfigData>
 {
     internal UserSettings(bool saveOnQuit) : base("userSettings.json", saveOnQuit: saveOnQuit)
     {
+    }
+
+    /// <summary>
+    /// Initializes gated debug logging based on current user settings configuration.
+    /// </summary>
+    public static void InitializeGatedLogging()
+    {
+        Log.Gated.Initialize(
+            Config.LogAudioDetails,
+            Config.LogAudioRenderingDetails,
+            Config.LogVideoRenderingDetails);
     }
 
     public sealed class ConfigData
@@ -41,8 +51,8 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
         public GraphHoverModes HoverMode = GraphHoverModes.LastValue;
 
         // Projects
-
-        public string ProjectsFolder = FileLocations.DefaultProjectFolder;
+        public List<string> ProjectDirectories = [];
+        public bool EnableUsbProjectDetection = true;
 
         // UI-Elements
         public bool ShowThumbnails = true;
@@ -84,6 +94,9 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
         public int ValueEditSmoothing = 6;
         public float ScrollSmoothing = 0.06f;
 
+        public bool UseTouchPadPanning = false;
+        public float PanSpeed = 20;
+
         // Mag Graph
         public bool DisconnectOnUnsnap = true;
         public float MaxCurveRadius = 350;
@@ -110,6 +123,8 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
 
         public bool EditorHoverPreview = true;
 
+        public bool ShowSkillQuestInHub = true;
+
         // Asset Lib
         public bool SyncWithOperatorSelection = true;
         public bool ScrollAssetLibToActive = true;
@@ -118,10 +133,13 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
         public string UserName = UndefinedUserName;
         public bool EnableAutoBackup = true;
 
-        // Other settings
         public float GizmoSize = 100;
+
+        // Fullscreen settings
         public int FullScreenIndexMain = 0;
+        // Output window
         public int FullScreenIndexViewer = 0;
+        public Vector4 OutputArea = new(0,0,0,0);
 
         // Timeline
         public float TimeRasterDensity = 1f;
@@ -130,19 +148,26 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
         public float SpaceMouseRotationSpeedFactor = 1f;
         public float SpaceMouseMoveSpeedFactor = 1f;
         public float SpaceMouseDamping = 0.5f;
-
         // Rendering (controlled from render windows)
         public string RenderVideoFilePath = "./Render/render-v01.mp4";
         public string RenderSequenceFilePath = "./ImageSequence/";
-        public string RenderSequenceFileName = "Output_";
+        public string RenderSequenceFileName = "v01";
+        public string RenderSequencePrefix = "render";
 
         // Profiling and debugging
+        public bool LoadMultiThreaded = true;
         public bool EnableFrameProfiling = true;
         public bool KeepTraceForLogMessages = false;
         public bool EnableGCProfiling = false;
+        public bool EnableMidiDebugLogging = false;
         public bool ShowOperatorStats = false;
+        
+        // Gated Debug Logging
+        public bool LogAudioDetails = false;
+        public bool LogAudioRenderingDetails = false;
+        public bool LogVideoRenderingDetails = false;
 
-        public CompilerOptions.Verbosity CompileCsVerbosity = CompilerOptions.Verbosity.Normal;
+        public CompilerOptions.Verbosity CompileCsVerbosity = CompilerOptions.Verbosity.Minimal;
 
         [JsonConverter(typeof(StringEnumConverter))]
         public TimeFormat.TimeDisplayModes TimeDisplayMode = TimeFormat.TimeDisplayModes.Bars;
@@ -157,9 +182,11 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
 
         public bool ExpandSpectrumVisualizerVertically = true;
         public int GridOutputColumnCount = 16;
-
         //private string _defaultNewProjectDirectory = _defaultProjectFolder;
         //public string DefaultNewProjectDirectory => _defaultNewProjectDirectory ??= _defaultProjectFolder;
+
+        // Rendering Profiling
+        public bool ShowRenderProfilingLogs = false;
 
         private static readonly string _defaultProjectFolder = FileLocations.DefaultProjectFolder;
     }
@@ -201,4 +228,5 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
     {
         Config.LastOpsForWindows[title] = opInstanceId;
     }
+    // Rendering Profiling
 }

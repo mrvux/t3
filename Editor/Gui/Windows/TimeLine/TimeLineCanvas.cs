@@ -59,7 +59,7 @@ internal sealed class TimeLineCanvas : CurveEditCanvas
 
         // Very ugly hack to prevent scaling the output above window size
         var keepScale = T3Ui.UiScaleFactor;
-        T3Ui.UiScaleFactor = 1;
+        //T3Ui.UiScaleFactor = 1;
 
         ScrollToTimeAfterStopped();
 
@@ -521,6 +521,7 @@ internal sealed class TimeLineCanvas : CurveEditCanvas
         public required IInputSlot Input;
         public required Instance Instance;
         public required SymbolUi.Child ChildUi;
+        
         public required int Hash;
         public float DampedMinValue;
         public float DampedMaxValue;

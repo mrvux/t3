@@ -29,6 +29,7 @@ internal abstract class OutputUi<T> : IOutputUi
                 Recompute(slot, context);
             }
         }
+        
         drawList.ChannelsSetCurrent(0);
         {
             DrawTypedValue(slot, viewId);
@@ -47,7 +48,7 @@ internal abstract class OutputUi<T> : IOutputUi
 
     protected void StartInvalidation(ISlot slot)
     {
-        DirtyFlag.InvalidationRefFrame++;
-        slot.Invalidate();
+        DirtyFlag.GlobalInvalidationTick++;
+        slot.InvalidateGraph();
     }
 }

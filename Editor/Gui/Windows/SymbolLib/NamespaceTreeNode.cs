@@ -14,12 +14,16 @@ internal sealed class NamespaceTreeNode
 {
     internal string Name { get; private set; }
     internal List<NamespaceTreeNode> Children { get; } = new();
-    private NamespaceTreeNode? Parent { get; }
+    internal readonly int Id;
+    internal NamespaceTreeNode? Parent { get; }
+    internal string Namespace => GetAsString();
+    internal SymbolFolderTypes FolderType = SymbolFolderTypes.Undefined;
 
     internal NamespaceTreeNode(string name, NamespaceTreeNode? parent = null)
     {
         Name = name;
         Parent = parent;
+        Id = name.GetHashCode();
     }
 
     internal string GetAsString()
@@ -82,6 +86,16 @@ internal sealed class NamespaceTreeNode
         }
     }
 
+    internal enum SymbolFolderTypes
+    {
+        Undefined,
+        Root,
+        User,
+        UserSubNamespace,
+        Project,
+        ProjectSubNamespace,
+    } 
+
     private void SortInOperator(Symbol symbol)
     {
         if (symbol.Namespace == null)
@@ -89,19 +103,21 @@ internal sealed class NamespaceTreeNode
             return;
         }
 
-        var spaces = symbol.Namespace.Split('.');
+        var symbolNamespaceParts = symbol.SymbolPackage.RootNamespace.Split('.');
+
+        var parts = symbol.Namespace.Split('.');
 
         var currentNode = this;
         var expandingSubTree = false;
 
-        foreach (var spaceName in spaces)
+        foreach (var part in parts)
         {
-            if (spaceName == "")
+            if (part == "")
                 continue;
 
             if (!expandingSubTree)
             {
-                if(currentNode.TryFindNodeDataByName(spaceName, out var node))
+                if(currentNode.TryFindNodeDataByName(part, out var node))
                 {
                     currentNode = node;
                 }
@@ -114,12 +130,47 @@ internal sealed class NamespaceTreeNode
             if (!expandingSubTree)
                 continue;
 
-            var newNode = new NamespaceTreeNode(spaceName, currentNode);
+            var newNode = new NamespaceTreeNode(part, currentNode);
+
+            var typeIndex = GetIndexInList(part, symbolNamespaceParts);
+            if (typeIndex == -1)
+            {
+                newNode.FolderType = SymbolFolderTypes.ProjectSubNamespace;
+            }
+            else if (typeIndex == symbolNamespaceParts.Length - 1)
+            {
+                newNode.FolderType = SymbolFolderTypes.Project;
+            }
+            else if (typeIndex == 0)
+            {
+                newNode.FolderType = SymbolFolderTypes.User;
+            }
+            else
+            {
+                newNode.FolderType = SymbolFolderTypes.UserSubNamespace;
+            }
+            
             currentNode.Children.Add(newNode);
             currentNode = newNode;
         }
 
         currentNode.Symbols.Add(symbol);
+    }
+
+    private static int GetIndexInList(string part, string[] list)
+    {
+        var partIndex = -1;
+        
+        foreach (var p in list)
+        {
+            partIndex++;
+            if (p.Equals(part, StringComparison.InvariantCultureIgnoreCase))
+            {
+                return partIndex;
+            }
+        }
+
+        return -1;
     }
 
     private bool TryFindNodeDataByName(string name, [NotNullWhen(true)]out  NamespaceTreeNode? node)

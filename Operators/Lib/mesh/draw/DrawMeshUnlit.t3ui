@@ -4,12 +4,26 @@
   "SymbolTags": "1",
   "InputUis": [
     {
+      "InputId": "126f1902-147b-4276-8c13-550976e78973"/*FillMode*/,
+      "Position": {
+        "X": 551.0433,
+        "Y": 4467.349
+      }
+    },
+    {
       "InputId": "2c88e7c4-04f8-4e45-94d8-214775c5609c"/*EnableZWrite*/,
       "Position": {
         "X": 551.0433,
         "Y": 4560.6885
       },
       "Description": "This defines whether the mesh covers itself or is covered by or covers other meshes."
+    },
+    {
+      "InputId": "33abccb4-cbf8-448b-95c7-b72d69c69af5"/*UseVertexColor*/,
+      "Position": {
+        "X": 550.2577,
+        "Y": 4915.0693
+      }
     },
     {
       "InputId": "44b31261-df87-4289-bc64-db349476e418"/*BlurLevel*/,
@@ -50,8 +64,8 @@
     {
       "InputId": "8d223463-edff-45fb-9ead-6650a911cebd"/*Culling*/,
       "Position": {
-        "X": 551.0433,
-        "Y": 4470.6885
+        "X": 550.2577,
+        "Y": 4422.7627
       },
       "GroupTitle": "Z-Buffer",
       "Description": "Defines the transparency of the surfaces.\nNone: All surfaces are \"bothsided\" or always visible from all sides\nFront: The normals are flipped (frontside is transparent / backside visible)\nBack: Default (Frontside is visible / backside is invisible)"
@@ -60,7 +74,7 @@
       "InputId": "922cf855-2676-4a96-9d90-622791a6a423"/*BlendMode*/,
       "Position": {
         "X": 551.0433,
-        "Y": 4425.6885
+        "Y": 4371.5117
       },
       "Description": "Selects the Blendmode."
     },
@@ -104,8 +118,8 @@
     {
       "ChildId": "08a6f1a1-8fb2-4f41-9f57-e856caa980d1"/*GetForegroundColor*/,
       "Position": {
-        "X": 695.1195,
-        "Y": 3942.1948
+        "X": 906.06055,
+        "Y": 3996.7544
       }
     },
     {
@@ -177,7 +191,7 @@
     {
       "ChildId": "67937f52-c521-4fad-9007-fd28d6814c8b"/*_MeshBufferComponents*/,
       "Position": {
-        "X": 695.7166,
+        "X": 685.7166,
         "Y": 4113.189
       }
     },
@@ -224,6 +238,13 @@
       }
     },
     {
+      "ChildId": "a17463db-683d-4f75-b077-30d249bcdcff"/*BoolToFloat*/,
+      "Position": {
+        "X": 728.0109,
+        "Y": 5144.785
+      }
+    },
+    {
       "ChildId": "a1f667a2-74f7-424f-8660-8de125d80ea4"/*GetBufferComponents*/,
       "Position": {
         "X": 1334.5835,
@@ -233,8 +254,8 @@
     {
       "ChildId": "abeee841-af57-467e-a1e3-8d4684dd3606"/*BlendColors*/,
       "Position": {
-        "X": 872.82056,
-        "Y": 3990.1543
+        "X": 1046.0605,
+        "Y": 3961.7544
       }
     },
     {

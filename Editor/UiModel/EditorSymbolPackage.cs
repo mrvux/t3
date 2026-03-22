@@ -213,7 +213,8 @@ internal class EditorSymbolPackage : SymbolPackage
         }
         else
         {
-            Log.Debug($"{AssemblyInformation.Name}: Found {sourceCodeCount} operator source code files out of {sourceCodeAttempts} C# files.");
+            if(ProjectSettings.Config.LogCompilationDetails)
+                Log.Debug($"{AssemblyInformation.Name}: Found {sourceCodeCount} operator source code files out of {sourceCodeAttempts} C# files.");
         }
         #endif
 
@@ -298,17 +299,22 @@ internal class EditorSymbolPackage : SymbolPackage
     public bool HasHomeSymbol(out string? error)
     {
         error = null;
-        
+
         try
         {
-            var releaseInfo = ReleaseInfo;
-            if (releaseInfo.HomeGuid == Guid.Empty)
+            if (HomeSymbolId == Guid.Empty)
                 return false;
 
-            if (Symbols.ContainsKey(releaseInfo.HomeGuid)) 
+            if (Symbols.ContainsKey(HomeSymbolId)) 
                 return true;
+
+            if (Symbols.Count == 0)
+            {
+                error = $"Package {Name} has no Symbols definition.";
+                return false;
+            }
             
-            error = $"Home symbol {releaseInfo.HomeGuid} not found";
+            error = $"Home symbol {HomeSymbolId} not found";
             return false;
         }
         catch (Exception e)
@@ -352,7 +358,11 @@ internal class EditorSymbolPackage : SymbolPackage
 
     private readonly ConcurrentDictionary<Guid, SymbolPathHandler> _filePathHandlers = new();
     protected IDictionary<Guid, SymbolPathHandler> FilePathHandlers => _filePathHandlers;
-    public Guid HomeSymbolId => ReleaseInfo.HomeGuid;
+    public Guid HomeSymbolId => OverrideHomeGuid != Guid.Empty 
+                                    ? OverrideHomeGuid 
+                                    : ReleaseInfo.HomeGuid;
+
+    public Guid OverrideHomeGuid = Guid.Empty;
 
     internal const string SourceCodeExtension = ".cs";
     public const string SymbolUiExtension = ".t3ui";
@@ -553,10 +563,16 @@ internal class EditorSymbolPackage : SymbolPackage
         
         NeedsAssemblyLoad = true;
     }
+    
 
     protected bool UnloadInProgress { get; private set; }
     public event Action? AssemblyUnloading;
     private readonly List<Type> _descriptiveUiTypes = [];
+
+    public static void NotifySymbolStructureChange()
+    {
+        SymbolStructureVersionCounter++;
+    }
     
-    //private readonly List<IEditorUiExtension> _extensions = [];
+    public static int SymbolStructureVersionCounter { get; private set; }
 }

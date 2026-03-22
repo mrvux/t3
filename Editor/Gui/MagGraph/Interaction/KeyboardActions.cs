@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using T3.Editor.Gui.Interaction;
 using T3.Editor.Gui.Interaction.Keyboard;
 using T3.Editor.Gui.MagGraph.Model;
@@ -21,9 +21,7 @@ internal static class KeyboardActions
 
         if (UserActions.FocusSelection.Triggered())
         {
-            // TODO: Implement
-            Log.Debug("Not implemented yet");
-            context.View.FocusViewToSelection(context);
+            context.ProjectView.FocusViewToSelection();
         }
 
         if (!T3Ui.IsCurrentlySaving && UserActions.Duplicate.Triggered())
@@ -86,9 +84,11 @@ internal static class KeyboardActions
             }
             else
             {
-                // FIXME: This is a work around that needs a legacy graph window to be active
                 if (ProjectView.Focused != null)
-                    NodeActions.PinSelectedToOutputWindow(ProjectView.Focused, context.Selector, compositionOp, true);
+                    NodeActions.PinSelectedToOutputWindow(ProjectView.Focused, 
+                                                          context.Selector, 
+                                                          compositionOp, 
+                                                          true);
             }
         }
 
@@ -103,13 +103,21 @@ internal static class KeyboardActions
 
         if (UserActions.CopyToClipboard.Triggered())
         {
-            NodeActions.CopySelectedNodesToClipboard(context.Selector, compositionOp);
+            // Prevent node graph copy if a text input is active (e.g., annotation description)
+            if (!ImGuiNET.ImGui.IsAnyItemActive())
+            {
+                NodeActions.CopySelectedNodesToClipboard(context.Selector, compositionOp);
+            }
         }
 
         if (!T3Ui.IsCurrentlySaving && UserActions.PasteFromClipboard.Triggered())
         {
-            NodeActions.PasteClipboard(context.Selector, context.View, compositionOp);
-            context.Layout.FlagStructureAsChanged();
+            // Prevent node graph paste if a text input is active (e.g., annotation description)
+            if (!ImGuiNET.ImGui.IsAnyItemActive())
+            {
+                NodeActions.PasteClipboard(context.Selector, context.View, compositionOp);
+                context.Layout.FlagStructureAsChanged();
+            }
         }
 
         if (!T3Ui.IsCurrentlySaving && UserActions.PasteValues.Triggered())

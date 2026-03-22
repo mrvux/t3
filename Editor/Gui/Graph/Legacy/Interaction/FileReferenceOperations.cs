@@ -5,7 +5,7 @@ using T3.Core.Resource;
 using T3.Editor.Gui.InputUi.SimpleInputUis;
 using T3.Editor.UiModel;
 
-namespace T3.Editor.Gui.Graph.Legacy.Interaction;
+namespace T3.Editor.Gui.Legacy.Interaction;
 
 /// <summary>
 /// Now defunct helper to fix missing file path references
@@ -17,7 +17,7 @@ public class FileReferenceOperations
         AssetFiles.Clear();
 
         // we use the shared shader packages as that includes all packages with no exclusions
-        foreach (var directory in ResourceManager.SharedShaderPackages.Select(x => x.ResourcesFolder))
+        foreach (var directory in ResourcePackageManager.SharedResourcePackages.Select(x => x.AssetsFolder))
         {
             ScanAssetDirectory(directory);
         }

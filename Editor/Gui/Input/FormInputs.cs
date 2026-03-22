@@ -190,11 +190,10 @@ internal static class FormInputs
 
     public static bool DrawEnumDropdown<T>(ref T selectedValue, string? label, T defaultValue= default) where T : struct, Enum, IConvertible, IFormattable, IComparable
     {
-        var names = Enum.GetNames<T>();
         var index = 0;
         var selectedIndex = 0;
 
-        foreach (var n in names)
+        foreach (var n in Enum.GetNames<T>())
         {
             if (n == selectedValue.ToString())
             {
@@ -208,7 +207,7 @@ internal static class FormInputs
         ImGui.PushStyleColor(ImGuiCol.FrameBg, UiColors.BackgroundButton.Rgba);
         ImGui.PushStyleColor(ImGuiCol.Text, selectedValue.Equals(defaultValue) ? UiColors.TextMuted.Rgba : UiColors.ForegroundFull.Rgba);
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5);
-        var modified = ImGui.Combo($"##dropDown{typeof(T)}{label}", ref selectedIndex, names, names.Length, names.Length);
+        var modified = ImGui.Combo($"##dropDown{typeof(T)}{label}", ref selectedIndex, Enum.GetNames<T>(), Enum.GetNames<T>().Length, Enum.GetNames<T>().Length);
         if (modified)
         {
             selectedValue = Enum.GetValues<T>()[selectedIndex];
@@ -306,7 +305,187 @@ internal static class FormInputs
         AppendTooltip(tooltip);
         return modified;
     }
-    
+
+    private static readonly Dictionary<string, string> _listBoxAddInputs = new();
+    // Dragging state for reorder: persistent across frames while mouse button is down
+    private static int _draggingIndex = -1;
+    private static bool _isDragging;
+
+    public static bool AddEditableListBox(ref string selectedValue,
+                                    IList<string> values,
+                                    string label,
+                                    Predicate<string>? warningPredicate,
+                                    String? warningText,
+                                    string? tooltip = null)
+     {
+         DrawInputLabel(label);
+
+         var imguiLabel = "##ListBox" + label;
+
+         // compute input size early
+         var inputSize = GetAvailableInputSize(tooltip, false, true);
+
+         // Compute box height: account for all items plus the bottom transient add-row; add 1.5 lines total so the add-row is visible
+         var lineHeight = ImGui.GetTextLineHeightWithSpacing();
+         var listBoxHeight = MathF.Min(300, (values.Count + 2.5f) * lineHeight);
+         var size = inputSize with { Y = listBoxHeight };
+
+         var modified = false;
+         if (ImGui.BeginListBox(imguiLabel, size))
+         {
+              try
+              {
+                // Remember the list content start Y so we can compute item indices based on mouse Y while dragging
+                var listStartY = ImGui.GetCursorScreenPos().Y;
+                  // Top: existing items
+                  for (var i = 0; i < values.Count; i++)
+                  {
+                      ImGui.PushID(i);
+                      ImGui.AlignTextToFramePadding();
+
+                      // Drag handle
+                      ImGui.Button($"{i}.");
+                      // start drag if user presses the handle
+                      if (ImGui.IsItemActive() && !_isDragging && ImGui.IsMouseDown(0))
+                      {
+                          _isDragging = true;
+                          _draggingIndex = i;
+                      }
+
+                      // continue drag while mouse down
+                      if (_isDragging && ImGui.IsMouseDown(0) && _draggingIndex >= 0)
+                      {
+                          var mouseY = ImGui.GetMousePos().Y;
+                          var targetIndex = (int)((mouseY - listStartY) / lineHeight);
+                          targetIndex = Math.Clamp(targetIndex, 0, values.Count - 1);
+                          if (targetIndex != _draggingIndex)
+                          {
+                              (values[targetIndex], values[_draggingIndex]) = (values[_draggingIndex], values[targetIndex]);
+                              modified = true;
+                              _draggingIndex = targetIndex;
+                          }
+                      }
+
+                      // stop dragging when mouse released
+                      if (_isDragging && !ImGui.IsMouseDown(0))
+                      {
+                          _isDragging = false;
+                          _draggingIndex = -1;
+                      }
+
+                      ImGui.SameLine(30 * T3Ui.UiScaleFactor);
+
+                      var value = values[i];
+
+                      // warning icon on the left
+                      var hasWarning = warningPredicate != null && !warningPredicate(value);
+                      if (hasWarning)
+                      {
+                          AddIcon(Icon.Warning);
+                          if (ImGui.IsItemHovered())
+                          {
+                              ImGui.BeginTooltip();
+                              ImGui.TextWrapped(warningText ?? "This entry may cause issues.");
+                              ImGui.EndTooltip();
+                          }
+                          ImGui.SameLine();
+                      }
+
+                      // compute reserve space for two small buttons
+                      var style = ImGui.GetStyle();
+                      var padX = style.FramePadding.X * 2;
+                      var wX = ImGui.CalcTextSize("×").X + padX;
+                      var wPlus = ImGui.CalcTextSize("+").X + padX;
+                      var buttonSpacing = style.ItemSpacing.X;
+                      var reservedRight = wX + wPlus + buttonSpacing;
+
+                      // set width for input so buttons fit on same line
+                      var regionAvail = ImGui.GetContentRegionAvail().X;
+                      ImGui.SetNextItemWidth(MathF.Max(20, regionAvail - reservedRight));
+
+                      var temp = value;
+                      if (ImGui.InputText("##item" + i + imguiLabel, ref temp, 1024u))
+                      {
+                          values[i] = temp;
+                          modified = true;
+                          if (selectedValue == value)
+                              selectedValue = temp;
+                      }
+
+                      // draw delete/insert on same line, right after the input
+                      ImGui.SameLine();
+                      if (ImGui.Button("×"))
+                      {
+                          if (selectedValue == value)
+                              selectedValue = string.Empty;
+
+                          values.RemoveAt(i);
+                          modified = true;
+                          ImGui.PopID();
+                          i--;
+                          continue;
+                      }
+
+                      ImGui.SameLine();
+                      if (ImGui.Button("+"))
+                      {
+                          values.Insert(i, value);
+                          modified = true;
+                          i++; // skip the inserted duplicate
+                      }
+
+                      ImGui.PopID();
+                 }
+
+                 // Bottom: add new item input
+                 ImGui.Separator();
+                 ImGui.PushID("add" + imguiLabel);
+                 if (!_listBoxAddInputs.TryGetValue(imguiLabel, out var addInput))
+                    addInput = string.Empty;
+
+                 // Shift cursor horizontally to match the per-item input left offset (drag-handle width)
+                 ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 30 * T3Ui.UiScaleFactor);
+
+                 // Compute reserved right width same as per-item (X + + spacing) so plus aligns exactly
+                 var styleBottom = ImGui.GetStyle();
+                 var padXBottom = styleBottom.FramePadding.X * 2;
+                 var wXBottom = ImGui.CalcTextSize("×").X + padXBottom;
+                 var wPlusBottom = ImGui.CalcTextSize("+").X + padXBottom;
+                 var buttonSpacingBottom = styleBottom.ItemSpacing.X;
+                 var reservedRightSame = wXBottom + wPlusBottom + buttonSpacingBottom;
+
+                 var regionAvailBottom = ImGui.GetContentRegionAvail().X;
+                 ImGui.SetNextItemWidth(MathF.Max(20, regionAvailBottom - reservedRightSame));
+
+                 if (ImGui.InputText("##add" + imguiLabel, ref addInput, 1024u))
+                 {
+                    _listBoxAddInputs[imguiLabel] = addInput;
+                 }
+
+                 ImGui.SameLine();
+                 if (ImGui.Button("+"))
+                 {
+                    var trimmed = (addInput ?? string.Empty).Trim();
+                    if (!string.IsNullOrEmpty(trimmed))
+                    {
+                        values.Add(trimmed);
+                        selectedValue = trimmed;
+                        _listBoxAddInputs[imguiLabel] = string.Empty;
+                        modified = true;
+                    }
+                 }
+
+                 ImGui.PopID();
+              }
+              finally
+              {
+                  ImGui.EndListBox();
+              }
+         }
+
+        AppendTooltip(tooltip);
+        return modified;
+    }
 
     public static bool AddSegmentedButtonWithLabel<T>(ref T selectedValue, string label, float columnWidth = 0) where T : struct, Enum
     {
@@ -396,7 +575,7 @@ internal static class FormInputs
         if (!modified && wasNull)
             value = null!;  // Support legacy calls 
 
-        if (autoFocus && ImGui.IsWindowAppearing())
+        if (autoFocus)
         {
             // Todo - how the hell do you make this not select the entire text?
             ImGui.SetKeyboardFocusHere(-1);
@@ -522,7 +701,7 @@ internal static class FormInputs
         DrawInputLabel(label);
 
         var isFilePickerVisible = showFilePicker != FileOperations.FilePickerTypes.None;
-        float spaceForFilePicker = isFilePickerVisible ? 40 : 0;
+        float spaceForFilePicker = isFilePickerVisible ? 80 * T3Ui.UiScaleFactor : 0;
         var inputSize = GetAvailableInputSize(null, false, true, spaceForFilePicker);
         ImGui.SetNextItemWidth(inputSize.X);
 
@@ -546,7 +725,9 @@ internal static class FormInputs
 
         if (isFilePickerVisible)
         {
+            ImGui.PushID(label);
             modified |= FileOperations.DrawFileSelector(showFilePicker, ref value);
+            ImGui.PopID();
         }
 
         AppendTooltip(tooltip);
@@ -806,7 +987,7 @@ internal static class FormInputs
     #endregion
 
     #region internal helpers
-    private static Vector2 GetAvailableInputSize(string? tooltip, bool hasReset, bool fillWidth = false, float rightPadding = 0)
+    public static Vector2 GetAvailableInputSize(string? tooltip, bool hasReset, bool fillWidth = false, float rightPadding = 0)
     {
         var toolWidth = 20f * T3Ui.UiScaleFactor;
         var sizeForResetToDefault = hasReset ? toolWidth : 0;
@@ -891,4 +1072,5 @@ internal static class FormInputs
     private static float _widthRatio = 1;
     private static float LeftParameterPadding => _paramIndent * T3Ui.UiScaleFactor;
     public static float ParameterSpacing => 20 * T3Ui.UiScaleFactor;
+
 }

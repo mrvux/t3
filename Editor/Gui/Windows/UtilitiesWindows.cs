@@ -1,6 +1,7 @@
-﻿using ImGuiNET;
+using ImGuiNET;
 using T3.Editor.Gui.Input;
 using T3.Editor.Gui.Styling;
+using T3.Editor.Gui.UiHelpers.Thumbnails;
 using T3.Editor.Gui.Windows.Utilities;
 using T3.Editor.UiModel.Commands;
 using T3.Editor.UiModel.ProjectHandling;
@@ -28,7 +29,9 @@ internal sealed class UtilitiesWindow : Window
         Assets,
         CrashReporting,
         SvgConversion,
+        MsdfGeneration,
         OperatorMigration,
+        Thumbnails,
     }
 
     private Categories _activeCategory;
@@ -138,8 +141,26 @@ internal sealed class UtilitiesWindow : Window
                     SvgFontConversion.Draw();
                     break;
 
+                case Categories.MsdfGeneration:
+                    MsdfGeneration.Draw();
+                    break;
+
                 case Categories.OperatorMigration:
                     OperatorFormatMigrationHelper.Draw();
+                    break;
+                
+                case Categories.Thumbnails:
+                    FormInputs.AddCheckBox("Enable logging", ref ThumbnailManager.EnableLogging, null, false);
+                    if (ImGui.Button("Reset"))
+                    {
+                        ThumbnailManager.Reset();
+                    }
+                    
+                    if (ThumbnailManager.AtlasSrv != null)
+                    {
+                        ImGui.Image(ThumbnailManager.AtlasSrv.NativePointer, new Vector2(1024));
+                    }
+
                     break;
             }
 

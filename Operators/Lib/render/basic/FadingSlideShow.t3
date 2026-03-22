@@ -43,7 +43,7 @@
     },
     {
       "Id": "ca8724d8-a362-4af4-bdf8-a80a1b0ef72e"/*FolderWithImages*/,
-      "DefaultValue": "/t3/images/sequences/agingFacesMale"
+      "DefaultValue": "Examples:images/sequences/agingFacesFemale/"
     },
     {
       "Id": "cabb74b7-72c3-4916-8096-5890fc8e7023"/*BackgroundColor*/,
@@ -137,7 +137,13 @@
     {
       "Id": "2a5f70a5-fdcd-4d9b-a0ae-5785e2fce277"/*LoadImage*/,
       "SymbolId": "0b3436db-e283-436e-ba85-2f3a1de76a9d",
-      "InputValues": [],
+      "InputValues": [
+        {
+          "Id": "96044c6c-d005-4d61-b605-7a6896e98cb6"/*CacheResources*/,
+          "Type": "System.Boolean",
+          "Value": true
+        }
+      ],
       "Outputs": []
     },
     {
@@ -400,7 +406,13 @@
     {
       "Id": "af025c51-6dd8-4ab6-92bc-faec5391ebd4"/*LoadImage*/,
       "SymbolId": "0b3436db-e283-436e-ba85-2f3a1de76a9d",
-      "InputValues": [],
+      "InputValues": [
+        {
+          "Id": "96044c6c-d005-4d61-b605-7a6896e98cb6"/*CacheResources*/,
+          "Type": "System.Boolean",
+          "Value": true
+        }
+      ],
       "Outputs": []
     },
     {
@@ -410,7 +422,7 @@
       "Outputs": []
     },
     {
-      "Id": "b8296b8a-4ac8-4974-9d82-642dc33ada5f"/*PickFromStringList*/,
+      "Id": "b8296b8a-4ac8-4974-9d82-642dc33ada5f"/*PickStringFromList*/,
       "SymbolId": "ef357e66-24e9-4f54-8d86-869db74602f4",
       "InputValues": [],
       "Outputs": []
@@ -458,7 +470,7 @@
       "Outputs": []
     },
     {
-      "Id": "f9d98cbe-6228-4ff1-baab-e5106fe95c04"/*PickFromStringList*/,
+      "Id": "f9d98cbe-6228-4ff1-baab-e5106fe95c04"/*PickStringFromList*/,
       "SymbolId": "ef357e66-24e9-4f54-8d86-869db74602f4",
       "InputValues": [],
       "Outputs": []

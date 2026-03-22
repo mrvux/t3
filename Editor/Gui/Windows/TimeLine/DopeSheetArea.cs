@@ -60,7 +60,7 @@ internal sealed class DopeSheetArea : AnimationParameterEditing, ITimeObjectMani
             if (UserActions.Duplicate.Triggered())
             {
                 symbolUi.FlagAsModified();
-                DuplicateSelectedKeyframes(TimeLineCanvas.Playback.TimeInBars);
+                DuplicateSelectedKeyframes();
             }
 
             if (UserActions.InsertKeyframe.Triggered())
@@ -154,13 +154,13 @@ internal sealed class DopeSheetArea : AnimationParameterEditing, ITimeObjectMani
             var iconColor = isPinned ? UiColors.StatusAnimated : UiColors.Gray;
             iconColor = iconColor.Fade(ImGui.IsItemHovered() ? 1 : 0.8f);
 
-            Icons.DrawIconAtScreenPosition(Icon.Pin, lastPos + new Vector2(2, 5), drawList, iconColor);
+            Icons.DrawIconAtScreenPosition(Icon.Pin, lastPos + new Vector2(2, 5) * T3Ui.UiScaleFactor, drawList, iconColor);
             var labelColor = layerHovered
                                  ? UiColors.ForegroundFull
                                  : isPinned
                                      ? UiColors.StatusAnimated
                                      : UiColors.TextMuted;
-            drawList.AddText(lastPos + new Vector2(20, 3), labelColor, label);
+            drawList.AddText(lastPos + new Vector2(20, 3) * T3Ui.UiScaleFactor, labelColor, label);
             ImGui.PopID();
         }
 
@@ -519,7 +519,7 @@ internal sealed class DopeSheetArea : AnimationParameterEditing, ITimeObjectMani
         }
 
         var posOnScreen = new Vector2(
-                                      TimeLineCanvas.Current.TransformX(vDefU) - KeyframeIconWidth / 2 + 1,
+                                      TimeLineCanvas.Current.TransformX(vDefU) - KeyframeIconWidth * T3Ui.UiScaleFactor / 2 + 1,
                                       layerArea.Min.Y);
 
         if (vDef.OutEditMode == VDefinition.EditMode.Constant)
@@ -670,6 +670,8 @@ internal sealed class DopeSheetArea : AnimationParameterEditing, ITimeObjectMani
     }
 
     private int _clickedKeyframeHash;
+
+
 
     protected internal override void HandleCurvePointDragging(in Guid compositionSymbolId, VDefinition vDef, bool isSelected)
     {
@@ -885,7 +887,7 @@ internal sealed class DopeSheetArea : AnimationParameterEditing, ITimeObjectMani
     private const float KeyframeIconWidth = 10;
     private Vector2 _minScreenPos;
     private static ChangeKeyframesCommand? _changeKeyframesCommand;
-    public const int LayerHeight = 25;
+    public  static int LayerHeight => (int)(25f * T3Ui.UiScaleFactor);
     private readonly ValueSnapHandler _snapHandler;
     private int _selectionCountBeforeClick;
     public bool MouseClickChangedSelection;

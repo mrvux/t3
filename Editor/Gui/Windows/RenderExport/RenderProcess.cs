@@ -1,4 +1,5 @@
-﻿#nullable enable
+#nullable enable
+using System.Diagnostics;
 using System.IO;
 using T3.Core.Animation;
 using T3.Core.Audio;
@@ -16,108 +17,375 @@ namespace T3.Editor.Gui.Windows.RenderExport;
 
 internal static class RenderProcess
 {
-    public static string LastHelpString { get; private set; } = string.Empty;
-
-    public static double Progress => _frameCount <= 1 ? 0.0 : (_frameIndex / (double)(_frameCount - 1));
-    
+    public static OutputWindow? OutputWindow;
     public static Type? MainOutputType { get; private set; }
-    public static Int2 MainOutputOriginalSize;
-    public static Int2 MainOutputRenderedSize;
     public static Texture2D? MainOutputTexture;
-    
+
+    public static bool IsExporting => State == States.Exporting;
     public static States State;
 
-    // TODO: clarify the difference
-    public static bool IsExporting { get; private set; }
-    public static bool IsToollRenderingSomething { get; private set; }
-    
-    public static double ExportStartedTimeLocal;
-    
     public enum States
     {
+        Undefined,
         NoOutputWindow,
         NoValidOutputType,
         NoValidOutputTexture,
-        WaitingForExport,
+        ReadyForExport,
         Exporting,
     }
 
-    /// <remarks>
-    /// needs to be called once per frame
-    /// </remarks>
+    public static string LastHelpString { get; private set; } = string.Empty;
+    public static string LastTargetDirectory { get; private set; } = string.Empty;
+
+    public static double Progress => (_activeExportSession == null || _activeExportSession.FrameCount <= 1)
+                                         ? 0.0
+                                         : (_activeExportSession.FrameIndex / (double)(_activeExportSession.FrameCount - 1));
+
+    public static double ExportStartedTimeLocal => _activeExportSession?.ExportStartTimeLocal ?? 0;
+
+    #region main API methods
+    public static void TryRenderScreenShot()
+    {
+        if (MainOutputTexture == null) return;
+
+        var project = ProjectView.Focused?.OpenedProject;
+        if (project == null) return;
+
+        var projectFolder = project.Package.Folder;
+        var folder = Path.Combine(projectFolder, "Screenshots");
+
+        if (!Directory.Exists(folder))
+            Directory.CreateDirectory(folder);
+
+        var filename = Path.Join(folder, $"{DateTime.Now:yyyy_MM_dd-HH_mm_ss_fff}.png");
+        ScreenshotWriter.StartSavingToFile(RenderProcess.MainOutputTexture, filename, ScreenshotWriter.FileFormats.Png);
+        Log.Debug("Screenshot saved in: " + folder);
+    }
+
+    public static bool TryStartVideoExport()
+    {
+        if (MainOutputTexture == null || MainOutputTexture.IsDisposed)
+            return false;
+
+        var settings = RenderSettings.ForNextExport.Clone();
+
+        if (State != States.ReadyForExport)
+        {
+            Log.Warning("Export not available");
+            return false;
+        }
+
+        var targetFilePath = GetTargetFilePath(settings.RenderMode);
+
+        var directory = string.Empty;
+        try
+        {
+            directory = Path.GetDirectoryName(targetFilePath) ?? string.Empty;
+        }
+        catch (Exception e)
+        {
+            Log.Warning($"Can't get directory for path: {targetFilePath}:" + e.Message);
+        }
+
+        if (!RenderPaths.ValidateOrCreateTargetFolder(targetFilePath))
+            return false;
+
+        TryGetRenderResolution(settings, out var requestedResolution);
+
+        var newSession = new ExportSession
+                             {
+                                 Settings = settings,
+                                 FrameCount = RenderTiming.ComputeFrameCount(settings),
+                                 ExportStartedTime = Playback.RunTimeInSecs,
+                                 FrameIndex = 0,
+                                 RenderToFileResolution = requestedResolution,
+                                 TargetFilePath = targetFilePath,
+                                 TargetDirectory = directory,
+                             };
+
+        switch (newSession.Settings.RenderMode)
+        {
+            case RenderSettings.RenderModes.Video:
+                if (File.Exists(targetFilePath))
+                {
+                    try
+                    {
+                        File.Delete(targetFilePath);
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Warning($"Can't write {targetFilePath}:" + e.Message);
+                        return false;
+                    }
+                }
+
+                Log.Gated.VideoRender($"""
+                                       Initializing Mp4VideoWriter with: path={targetFilePath}
+                                       renderedSize={newSession.RenderToFileResolution.Width}x{newSession.RenderToFileResolution.Height}
+                                       bitrate={settings.Bitrate}
+                                       framerate={settings.FrameRate}
+                                       audio={settings.ExportAudio}
+                                       channels={RenderAudioInfo.SoundtrackChannels()}
+                                       sampleRate={RenderAudioInfo.SoundtrackSampleRate()}
+                                       """);
+                break;
+
+            case RenderSettings.RenderModes.ImageSequence:
+            default:
+
+                ScreenshotWriter.ClearQueue();
+                break;
+        }
+
+        LastTargetDirectory = Path.GetDirectoryName(targetFilePath) ?? string.Empty;
+
+        State = States.Exporting;
+
+        LastHelpString = "Rendering...";
+        _activeExportSession = newSession;
+        return true;
+    }
+
+    public static void Cancel(string? reason = null)
+    {
+        if (_activeExportSession == null)
+        {
+            State = States.Undefined;
+            return;
+        }
+
+        var duration = Playback.RunTimeInSecs - _activeExportSession.ExportStartedTime;
+        LastHelpString = reason ?? $"Render cancelled after {StringUtils.HumanReadableDurationFromSeconds(duration)}";
+        CleanupSession();
+    }
+    #endregion
+
+    private static bool TryInitVideoWriterWithFinalResolution(ExportSession session)
+    {
+        try
+        {
+            session.VideoWriter = new Mp4VideoWriter(session);
+
+            Log.Gated.VideoRender($"Mp4VideoWriter initialized: " +
+                                  $"Codec=H.264" +
+                                  $"FileFormat=mp4" +
+                                  $"Bitrate={session.Settings.Bitrate}" +
+                                  $"Framerate={session.Settings.FrameRate}" +
+                                  $"Channels={RenderAudioInfo.SoundtrackChannels()}" +
+                                  $"SampleRate={RenderAudioInfo.SoundtrackSampleRate()}");
+        }
+        catch (Exception ex)
+        {
+            var msg = $"Failed to initialize Mp4VideoWriter: {ex.Message}\n{ex.StackTrace}";
+            Log.Error(msg);
+            LastHelpString = msg;
+            CleanupSession();
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Needs to be called once per frame
+    /// </summary>
     public static void Update()
     {
-        var outputWindow = OutputWindow.GetPrimaryOutputWindow();
-        if (outputWindow == null)
+        if (!OutputWindow.TryGetPrimaryOutputWindow(out OutputWindow))
         {
             State = States.NoOutputWindow;
             return;
         }
 
-        MainOutputTexture = outputWindow.GetCurrentTexture();
-        if (MainOutputTexture == null)
+        MainOutputTexture = OutputWindow.GetCurrentTexture();
+        if (MainOutputTexture == null || MainOutputTexture.IsDisposed)
         {
             State = States.NoValidOutputTexture;
             return;
         }
 
-        MainOutputType = outputWindow.ShownInstance?.Outputs.FirstOrDefault()?.ValueType;
+        MainOutputType = OutputWindow.ShownInstance?.Outputs.FirstOrDefault()?.ValueType;
         if (MainOutputType != typeof(Texture2D))
         {
             State = States.NoValidOutputType;
             return;
         }
 
+        if (State != States.Exporting)
+        {
+            State = States.ReadyForExport;
+        }
+
         HandleRenderShortCuts();
 
         if (!IsExporting)
-        {
-            var desc = MainOutputTexture.Description;
-            MainOutputOriginalSize.Width = desc.Width;
-            MainOutputOriginalSize.Height = desc.Height;
+            return;
 
-            MainOutputRenderedSize = new Int2(((int)(desc.Width * RenderSettings.Current.ResolutionFactor)).Clamp(1,16384),
-                                              ((int)(desc.Height * RenderSettings.Current.ResolutionFactor)).Clamp(1,16384));
-            
-            State = States.WaitingForExport;
+        if (_activeExportSession == null)
+        {
+            Log.Warning("Reverting inconsistent render export state");
+            State = States.Undefined;
             return;
         }
 
-        State = States.Exporting;
+        ExportOutputTexture(MainOutputTexture, _activeExportSession);
+    }
 
-        // Process frame
-        bool success;
-        if (_renderSettings.RenderMode == RenderSettings.RenderModes.Video)
+    private static void ExportOutputTexture(Texture2D mainOutputTexture, ExportSession session)
+    {
+        var settings = session.Settings;
+        var savingSuccessful = false;
+
+        // Ensure resolution is valid
+        var currentResolution = new Int2(mainOutputTexture.Description.Width, mainOutputTexture.Description.Height);
+        var resolutionMatches = currentResolution == session.RenderToFileResolution;
+
+        if (!resolutionMatches)
         {
-            var audioFrame = AudioRendering.GetLastMixDownBuffer(1.0 / _renderSettings.Fps);
-            success = SaveVideoFrameAndAdvance( ref audioFrame, RenderAudioInfo.SoundtrackChannels(), RenderAudioInfo.SoundtrackSampleRate());
+            if (++session.ResolutionMismatchCount < 2)
+            {
+                Log.Debug($"Waiting for resolution {session.RenderToFileResolution.ToResolutionString()}...");
+                return;
+            }
+
+            Log.Debug("Falling back to " + currentResolution.ToResolutionString());
+            session.RenderToFileResolution = currentResolution;
         }
-        else
+
+        if (session.VideoWriter == null)
         {
-            AudioRendering.GetLastMixDownBuffer(Playback.LastFrameDuration);
-            success = SaveImageFrameAndAdvance();
+            if (!TryInitVideoWriterWithFinalResolution(session))
+                return;
+        }
+
+        switch (settings.RenderMode)
+        {
+            case RenderSettings.RenderModes.Video:
+            {
+                var audioFrame = ComputeAudioBufferForVideoFrame(session);
+                savingSuccessful = SaveVideoFrameAndAdvance(session, mainOutputTexture, ref audioFrame, RenderAudioInfo.SoundtrackChannels(),
+                                                            RenderAudioInfo.SoundtrackSampleRate());
+                break;
+            }
+            case RenderSettings.RenderModes.ImageSequence:
+                // Process audio for this frame to drive animations
+                var audioFrameFloat = AudioRendering.GetFullMixDownBuffer(1.0 / session.Settings.FrameRate);
+
+                // Update audio metering for UI/graph
+                double localFxTime = session.FrameIndex / session.Settings.FrameRate;
+                AudioRendering.EvaluateAllAudioMeteringOutputs(localFxTime, audioFrameFloat);
+                savingSuccessful = TrySaveImageFrameAndAdvance(mainOutputTexture);
+                break;
         }
 
         // Update stats
-        var effectiveFrameCount = _renderSettings.RenderMode == RenderSettings.RenderModes.Video ? _frameCount : _frameCount + 2;
-        var currentFrame = _renderSettings.RenderMode == RenderSettings.RenderModes.Video ? GetRealFrame() : _frameIndex + 1;
+        var effectiveFrameCount = settings.RenderMode == RenderSettings.RenderModes.Video ? session.FrameCount : session.FrameCount + 2;
 
-        var completed = currentFrame >= effectiveFrameCount || !success;
-        if (!completed) 
+        var exportedFrameIndex = session.FrameIndex - MfVideoWriter.SkipImages;
+
+        var currentFrame = settings.RenderMode == RenderSettings.RenderModes.Video
+                               ? exportedFrameIndex
+                               : session.FrameIndex + 1;
+
+        var completed = currentFrame >= effectiveFrameCount || !savingSuccessful;
+        if (!completed)
             return;
 
-        var duration = Playback.RunTimeInSecs - _exportStartedTime;
-        var successful = success ? "successfully" : "unsuccessfully";
-        LastHelpString = $"Render {GetTargetFilePath(_renderSettings.RenderMode)} finished {successful} in {StringUtils.HumanReadableDurationFromSeconds(duration)}";
+        var duration = Playback.RunTimeInSecs - session.ExportStartedTime;
+        var successful = savingSuccessful ? "successfully" : "unsuccessfully";
+        LastHelpString = $"Render {GetTargetFilePath(settings.RenderMode)} finished {successful} in {StringUtils.HumanReadableDurationFromSeconds(duration)}";
         Log.Debug(LastHelpString);
 
-        if (_renderSettings.AutoIncrementVersionNumber && success && _renderSettings.RenderMode == RenderSettings.RenderModes.Video)
-            RenderPaths.TryIncrementVideoFileNameInUserSettings();
+        if (savingSuccessful)
+        {
+            if (settings.RenderMode == RenderSettings.RenderModes.Video && settings.AutoIncrementVersionNumber)
+            {
+                RenderPaths.TryIncrementVideoFileNameInUserSettings();
+            }
+            else if (settings.RenderMode == RenderSettings.RenderModes.ImageSequence && settings.AutoIncrementSubFolder)
+            {
+                if (settings.CreateSubFolder)
+                {
+                    UserSettings.Config.RenderSequenceFileName = RenderPaths.GetNextIncrementedPath(UserSettings.Config.RenderSequenceFileName);
+                }
+                else
+                {
+                    UserSettings.Config.RenderSequencePrefix = RenderPaths.GetNextIncrementedPath(UserSettings.Config.RenderSequencePrefix);
+                }
 
-        Cleanup();
-        IsToollRenderingSomething = false;
+                UserSettings.Save();
+            }
+        }
+
+        CleanupSession();
     }
-    
+
+    /// <summary>
+    /// Computes the final render to file resolution from the current texture size and resolution scale factor. 
+    /// </summary>
+    /// <remarks>
+    /// Eventually this should also include rounding to even file sizes or clamping to the codec sizes provided in the setting. 
+    /// </remarks>
+    public static bool TryGetRenderResolution(RenderSettings settings, out Int2 resolution)
+    {
+        resolution = Int2.Zero;
+        if (State != States.ReadyForExport && State != States.Exporting)
+            return false;
+
+        if (MainOutputTexture == null || MainOutputTexture.IsDisposed)
+            return false;
+
+        // TODO: clamp for valid encoding resolutions...
+        resolution = new Int2(
+                              ((int)(MainOutputTexture.Description.Width * settings.ResolutionFactor)).Clamp(1, 16384),
+                              ((int)(MainOutputTexture.Description.Height * settings.ResolutionFactor)).Clamp(1, 16384));
+        return true;
+    }
+
+    public static RenderSettings GetActiveOrRequestedSettings()
+    {
+        return State == States.Exporting && _activeExportSession != null
+                   ? _activeExportSession.Settings
+                   : RenderSettings.ForNextExport;
+    }
+
+    public static bool TryGetActiveExportResolution(out Int2 resolution)
+    {
+        resolution = Int2.One;
+        if (State != States.Exporting || _activeExportSession == null)
+            return false;
+
+        resolution = _activeExportSession.RenderToFileResolution;
+        return true;
+    }
+
+    private static byte[] ComputeAudioBufferForVideoFrame(ExportSession session)
+    {
+        // Use the new full mixdown buffer for audio export
+        double localFxTime = session.FrameIndex / session.Settings.FrameRate;
+        Log.Gated.VideoRender($"Requested recording from {0.0000:F4} to {(session.FrameCount / session.Settings.FrameRate):F4} seconds");
+        Log.Gated.VideoRender($"Actually recording from {(session.FrameIndex / session.Settings.FrameRate):F4} to {((session.FrameIndex + 1) / session.Settings.FrameRate):F4} seconds due to frame raster");
+        var audioFrameFloat = AudioRendering.GetFullMixDownBuffer(1.0 / session.Settings.FrameRate);
+
+        // Safety: ensure audioFrameFloat is valid and sized
+        if (audioFrameFloat == null || audioFrameFloat.Length == 0)
+        {
+            Log.Error($"RenderProcess: AudioRendering.GetFullMixDownBuffer returned null or empty at frame {session.FrameIndex}");
+            var sampleRate = RenderAudioInfo.SoundtrackSampleRate();
+            var channels = RenderAudioInfo.SoundtrackChannels();
+            var floatCount = (int)Math.Max(Math.Round((1.0 / session.Settings.FrameRate) * sampleRate), 0.0) * channels;
+            audioFrameFloat = new float[floatCount]; // silence
+        }
+
+        // Convert float[] to byte[] for the writer
+        var audioFrame = new byte[audioFrameFloat.Length * sizeof(float)];
+        Buffer.BlockCopy(audioFrameFloat, 0, audioFrame, 0, audioFrame.Length);
+
+        // Force metering outputs to update for UI/graph
+        AudioRendering.EvaluateAllAudioMeteringOutputs(localFxTime, audioFrameFloat);
+        return audioFrame;
+    }
+
     private static void HandleRenderShortCuts()
     {
         if (MainOutputTexture == null)
@@ -131,7 +399,7 @@ internal static class RenderProcess
             }
             else
             {
-                TryStart(RenderSettings.Current);
+                TryStartVideoExport();
             }
         }
 
@@ -141,84 +409,37 @@ internal static class RenderProcess
         }
     }
 
-    
-    public static void TryStart(RenderSettings renderSettings)
+    private static string GetTargetFilePath(RenderSettings.RenderModes renderMode) => RenderPaths.GetTargetFilePath(renderMode);
+
+    private static void CleanupSession()
     {
-        if (IsExporting)
-        {
-            Log.Warning("Export is already in progress");
-            return;
-        }
-        
-        var targetFilePath = GetTargetFilePath(renderSettings.RenderMode);
-        if (!RenderPaths.ValidateOrCreateTargetFolder(targetFilePath))
+        if (_activeExportSession == null)
             return;
 
-        renderSettings.FrameCount = RenderTiming.ComputeFrameCount(renderSettings);
-        
-        IsToollRenderingSomething = true;
-        ExportStartedTimeLocal = Core.Animation.Playback.RunTimeInSecs;
-
-        _renderSettings = renderSettings;
-        
-        _frameIndex = 0;
-        _frameCount = Math.Max(_renderSettings.FrameCount, 0);
-
-        _exportStartedTime = Playback.RunTimeInSecs;
-
-        if (_renderSettings.RenderMode == RenderSettings.RenderModes.Video)
+        if (_activeExportSession.Settings.RenderMode == RenderSettings.RenderModes.Video)
         {
-            _videoWriter = new Mp4VideoWriter(targetFilePath, MainOutputOriginalSize, _renderSettings.ExportAudio)
-                               {
-                                   Bitrate = _renderSettings.Bitrate,
-                                   Framerate = (int)renderSettings.Fps
-                               };
-        }
-        else
-        {
-            _targetFolder = targetFilePath;
+            try
+            {
+                _activeExportSession.VideoWriter?.Dispose();
+                _activeExportSession.VideoWriter = null;
+            }
+            catch (Exception e)
+            {
+                Log.Debug("Failed to cleanup video writer: " + e.Message);
+            }
         }
 
-        ScreenshotWriter.ClearQueue();
+        // Audio restoration is now handled automatically by AudioRendering.EndRecording()
+        // which is called during the rendering process
 
-        // set playback to the first frame
-        RenderTiming.SetPlaybackTimeForFrame(ref _renderSettings, _frameIndex, _frameCount, ref _runtime);
-        IsExporting = true;
-        LastHelpString = "Rendering…";
+        // Release playback time before nulling _activeSession
+        RenderTiming.ReleasePlaybackTime(ref _activeExportSession.Settings, ref _activeExportSession.Runtime);
+        _activeExportSession = null;
+
+        State = States.ReadyForExport;
     }
 
-    private static int GetRealFrame() => _frameIndex - MfVideoWriter.SkipImages;
-    
-    
-    private static string GetTargetFilePath(RenderSettings.RenderModes renderMode)
-    {
-        return renderMode == RenderSettings.RenderModes.Video
-                   ? RenderPaths.ResolveProjectRelativePath(UserSettings.Config.RenderVideoFilePath)
-                   : RenderPaths.ResolveProjectRelativePath(UserSettings.Config.RenderSequenceFilePath);
-    }
-
-    public static void Cancel(string? reason = null)
-    {
-        var duration = Playback.RunTimeInSecs - _exportStartedTime;
-        LastHelpString = reason ?? $"Render cancelled after {StringUtils.HumanReadableDurationFromSeconds(duration)}";
-        Cleanup();
-        IsToollRenderingSomething = false;
-    }
-
-    private static void Cleanup()
-    {
-        IsExporting = false;
-
-        if (_renderSettings.RenderMode == RenderSettings.RenderModes.Video)
-        {
-            _videoWriter?.Dispose();
-            _videoWriter = null;
-        }
-
-        RenderTiming.ReleasePlaybackTime(ref _renderSettings, ref _runtime);
-    }
-
-    private static bool SaveVideoFrameAndAdvance( ref byte[] audioFrame, int channels, int sampleRate)
+    private static bool SaveVideoFrameAndAdvance(ExportSession session, Texture2D outputTexture, ref byte[] audioFrame, int channels, int sampleRate)
     {
         if (Playback.OpNotReady)
         {
@@ -228,71 +449,86 @@ internal static class RenderProcess
 
         try
         {
-            _videoWriter?.ProcessFrames( MainOutputTexture, ref audioFrame, channels, sampleRate);
-            _frameIndex++;
-            RenderTiming.SetPlaybackTimeForFrame(ref _renderSettings, _frameIndex, _frameCount, ref _runtime);
+            if (UserSettings.Config.ShowRenderProfilingLogs)
+            {
+                Log.Debug($"""
+                           SaveVideoFrameAndAdvance: frame={session.FrameIndex}
+                           MainOutputTexture null? {MainOutputTexture == null}
+                           audioFrame.Length={audioFrame?.Length}
+                           channels={channels}
+                           sampleRate={sampleRate}
+                           """);
+            }
+
+            RenderTiming.SetPlaybackTimeForFrame(session);
+
+            // We need to wait for one frame of the outputTexture to update to the new time 
+            if (session.FrameIndex > 0)
+                session.VideoWriter?.ProcessFrames(outputTexture, ref audioFrame, channels, sampleRate);
+
+            session.FrameIndex++;
             return true;
         }
         catch (Exception e)
         {
-            LastHelpString = e.ToString();
-            Cleanup();
-            return false;
+            var wasFileWriteException = e is SharpDX.SharpDXException dxEx && (uint)dxEx.HResult == 0x80070020;
+            var msg = wasFileWriteException
+                          ? "The output file is in use by another process. Please close any application using it and try again."
+                          : $"Exception in SaveVideoFrameAndAdvance at frame {session.FrameIndex}: {e.Message}\n{e.StackTrace}";
+
+            Log.Error(msg);
+            LastHelpString = msg;
+            CleanupSession();
         }
+
+        return false;
     }
 
     private static string GetSequenceFilePath()
     {
-        var prefix = RenderPaths.SanitizeFilename(UserSettings.Config.RenderSequenceFileName);
-        return Path.Combine(_targetFolder, $"{prefix}_{_frameIndex:0000}.{_renderSettings.FileFormat.ToString().ToLower()}");
+        var prefix = RenderPaths.SanitizeFilename(UserSettings.Config.RenderSequencePrefix);
+        return Path.Combine(_activeExportSession!.TargetDirectory,
+                            $"{prefix}_{_activeExportSession.FrameIndex:0000}.{_activeExportSession.Settings.FileFormat.ToString().ToLower()}");
     }
 
-    private static bool SaveImageFrameAndAdvance()
+    private static bool TrySaveImageFrameAndAdvance(Texture2D mainOutputTexture)
     {
-        if (MainOutputTexture == null)
-            return false;
-        
         try
         {
-            var success = ScreenshotWriter.StartSavingToFile(MainOutputTexture, GetSequenceFilePath(), _renderSettings.FileFormat);
-            _frameIndex++;
-            RenderTiming.SetPlaybackTimeForFrame(ref _renderSettings, _frameIndex, _frameCount, ref _runtime);
-            return success;
+            if (!ScreenshotWriter.StartSavingToFile(mainOutputTexture, GetSequenceFilePath(), _activeExportSession!.Settings.FileFormat))
+                return false;
+
+            _activeExportSession.FrameIndex++;
+            RenderTiming.SetPlaybackTimeForFrame(_activeExportSession);
+            return true;
         }
         catch (Exception e)
         {
-            LastHelpString = e.ToString();
-            IsExporting = false;
+            Log.Warning(e.Message);
             return false;
         }
     }
 
-    // State
-    private static Mp4VideoWriter? _videoWriter;
-    private static string _targetFolder = string.Empty;
-    private static double _exportStartedTime;
-    private static int _frameIndex;
-    private static int _frameCount;
-    
-
-    private static RenderSettings _renderSettings = null!;
-    private static RenderTiming.Runtime _runtime;
-
-    public static void TryRenderScreenShot()
+    private static string ToResolutionString(this Int2 resolution)
     {
-        if (MainOutputTexture == null) return;
-        
-        var project = ProjectView.Focused?.OpenedProject;
-        if (project == null) return;
-        
-        var projectFolder = project.Package.Folder;
-        var folder = Path.Combine(projectFolder, "Screenshots");            
-            
-        if (!Directory.Exists(folder))
-            Directory.CreateDirectory(folder);
-
-        var filename = Path.Join(folder, $"{DateTime.Now:yyyy_MM_dd-HH_mm_ss_fff}.png");
-        ScreenshotWriter.StartSavingToFile(RenderProcess.MainOutputTexture, filename, ScreenshotWriter.FileFormats.Png);
-        Log.Debug("Screenshot saved in: " + folder);
+        return $"{resolution.Width}×{resolution.Height}";
     }
+
+    internal sealed class ExportSession
+    {
+        public Mp4VideoWriter? VideoWriter;
+        public string TargetDirectory = string.Empty;
+        public string TargetFilePath = string.Empty;
+        public double ExportStartedTime;
+        public int FrameIndex;
+        public int FrameCount;
+        public RenderSettings Settings = null!;
+        public RenderTiming.Runtime Runtime;
+        public readonly double ExportStartTimeLocal = 0;
+        public Int2 RenderToFileResolution;
+
+        public int ResolutionMismatchCount;
+    }
+
+    private static ExportSession? _activeExportSession;
 }

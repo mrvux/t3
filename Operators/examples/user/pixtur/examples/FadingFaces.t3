@@ -187,7 +187,7 @@
       "Outputs": []
     },
     {
-      "Id": "5aaa4d0b-f8d0-4cfe-bed3-ff780d0d6cb3"/*PickFromStringList*/,
+      "Id": "5aaa4d0b-f8d0-4cfe-bed3-ff780d0d6cb3"/*PickStringFromList*/,
       "SymbolId": "ef357e66-24e9-4f54-8d86-869db74602f4",
       "InputValues": [],
       "Outputs": []
@@ -333,11 +333,6 @@
       "Id": "de894d33-c408-44a7-8d25-b82b98587200"/*FilesInFolder*/,
       "SymbolId": "f90fcd0a-eab9-4e2a-b393-e8d3a0380823",
       "InputValues": [
-        {
-          "Id": "ca9778e7-072c-4304-9043-eeb2dc4ca5d7"/*Folder*/,
-          "Type": "System.String",
-          "Value": "Resources\\Example\\user\\pixtur\\VJ\\Faces\\ElderlyFaces"
-        },
         {
           "Id": "e14a4aae-e253-4d14-80ef-a90271cd306a"/*TriggerUpdate*/,
           "Type": "System.Boolean",

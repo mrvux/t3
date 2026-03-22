@@ -14,7 +14,7 @@
         {
           "Id": "ca9778e7-072c-4304-9043-eeb2dc4ca5d7"/*Folder*/,
           "Type": "System.String",
-          "Value": "Resources\\images"
+          "Value": "Examples:images/"
         },
         {
           "Id": "e14a4aae-e253-4d14-80ef-a90271cd306a"/*TriggerUpdate*/,
@@ -25,7 +25,7 @@
       "Outputs": []
     },
     {
-      "Id": "51d34f0d-5fee-434a-8bdd-e70a9d3586f0"/*PickFromStringList*/,
+      "Id": "51d34f0d-5fee-434a-8bdd-e70a9d3586f0"/*PickStringFromList*/,
       "SymbolId": "ef357e66-24e9-4f54-8d86-869db74602f4",
       "InputValues": [],
       "Outputs": []

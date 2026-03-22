@@ -1,0 +1,35 @@
+{
+  "Id": "46ce6fad-87fe-4d1f-b236-ae644dd1f76c"/*_ExecuteFastBlurPasses*/,
+  "Inputs": [
+    {
+      "Id": "5d19c8be-7ea0-4b8d-5f3d-9ebb3a914b8d"/*LinearSampler*/,
+      "DefaultValue": null
+    },
+    {
+      "Id": "692bc2f0-68f2-45ca-a0fb-cd1c5d08e982"/*SourceTexture*/,
+      "DefaultValue": null
+    },
+    {
+      "Id": "7f79b69a-5dd8-4c49-9b60-2a2d4c2b5a0f"/*Steps*/,
+      "DefaultValue": 0
+    },
+    {
+      "Id": "98e88d02-3b78-403c-b9c9-b5ecf8565acd"/*SourceTextureSrv*/,
+      "DefaultValue": null
+    },
+    {
+      "Id": "b82c9d56-19d6-4d2b-9e6f-1a1b1cbe9a25"/*UpsampleBlurPS*/,
+      "DefaultValue": null
+    },
+    {
+      "Id": "d0b64c21-46c5-45a3-9f68-2e7b2b2cf3a1"/*DownsampleBlurPS*/,
+      "DefaultValue": null
+    },
+    {
+      "Id": "e6a25147-0739-4416-e8c6-2745c32ad416"/*FullscreenVS*/,
+      "DefaultValue": null
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}

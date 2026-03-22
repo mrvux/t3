@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using T3.Core.Operator;
@@ -11,7 +11,7 @@ using T3.Editor.UiModel.ProjectHandling;
 using T3.Editor.UiModel.Selection;
 using Vector2 = System.Numerics.Vector2;
 
-namespace T3.Editor.Gui.Graph.Legacy.Interaction.Connections;
+namespace T3.Editor.Gui.Legacy.Interaction.Connections;
 
 /// <summary>
 /// Handles the creation of new  <see cref="Symbol.Connection"/>s. 
@@ -530,7 +530,8 @@ internal static class ConnectionMaker
                                                             && c.ConnectionType == firstConnectionType);
             if (validForMultiInput)
             {
-                var oldConnections = connectionList.ToArray().Reverse();
+                var oldConnections = connectionList.ToArray();
+                Array.Reverse(oldConnections);
                 connectionList.Clear();
                 foreach (var c in oldConnections)
                 {

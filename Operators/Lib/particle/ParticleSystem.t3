@@ -18,7 +18,7 @@
       "DefaultValue": 0.15
     },
     {
-      "Id": "4c555ac3-3d62-47a7-9d1a-49e4d5808635"/*SetFx2To*/,
+      "Id": "4c555ac3-3d62-47a7-9d1a-49e4d5808635"/*SetF2To*/,
       "DefaultValue": 0
     },
     {
@@ -42,11 +42,11 @@
       "DefaultValue": 1.0
     },
     {
-      "Id": "a7350ba8-08be-4afc-92f1-d223ee9bcbeb"/*SetFx1To*/,
+      "Id": "a7350ba8-08be-4afc-92f1-d223ee9bcbeb"/*SetF1To*/,
       "DefaultValue": 1
     },
     {
-      "Id": "b2c8f7cf-fdf5-4819-98ec-2c70ee9e8bc6"/*RadiusFromW*/,
+      "Id": "b2c8f7cf-fdf5-4819-98ec-2c70ee9e8bc6"/*RadiusFactor*/,
       "DefaultValue": 0.01
     },
     {
@@ -111,7 +111,7 @@
         {
           "Id": "afb69c81-5063-4cb9-9d42-841b994b5ec0"/*Source*/,
           "Type": "System.String",
-          "Value": "Resources/lib/particles/ParticleSystem.hlsl"
+          "Value": "Lib:shaders/particles/ParticleSystem.hlsl"
         }
       ],
       "Outputs": []

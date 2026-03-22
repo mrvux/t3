@@ -1,9 +1,10 @@
+#nullable enable
+
+using System.Diagnostics.CodeAnalysis;
 using ImGuiNET;
-using System.IO;
 using T3.Core.DataTypes;
-using T3.Core.IO;
+using T3.Core.DataTypes.Vector;
 using T3.Core.Operator;
-using T3.Core.Utils;
 using T3.Editor.Gui.Interaction;
 using T3.Editor.Gui.Interaction.Keyboard;
 using T3.Editor.Gui.OutputUi;
@@ -11,8 +12,9 @@ using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.Gui.Windows.Layouts;
 using T3.Editor.Gui.Windows.RenderExport;
+using T3.Editor.Skills;
 using T3.Editor.UiModel;
-using T3.Editor.UiModel.ProjectHandling;
+using SkillTraining = T3.Editor.Skills.Training.SkillTraining;
 using Texture2D = T3.Core.DataTypes.Texture2D;
 using Vector2 = System.Numerics.Vector2;
 
@@ -35,11 +37,11 @@ internal sealed class OutputWindow : Window
         OutputWindowInstances.Add(this);
     }
 
-    public static IEnumerable<OutputWindow> GetVisibleInstances()
+    private static IEnumerable<OutputWindow> GetVisibleInstances()
     {
         foreach (var i in OutputWindowInstances)
         {
-            if (!(i is OutputWindow outputWindow))
+            if (i is not OutputWindow outputWindow)
                 continue;
 
             if (!i.Config.Visible)
@@ -58,14 +60,28 @@ internal sealed class OutputWindow : Window
     //     }
     // }
 
-    public static OutputWindow GetPrimaryOutputWindow()
+    public static bool TryGetPrimaryOutputWindow([NotNullWhen(true)] out OutputWindow? outputWindow)
     {
-        return GetVisibleInstances().FirstOrDefault();
+        foreach (var window in OutputWindowInstances)
+        {
+            if (!window.Config.Visible)
+                continue;
+
+            if (window is not OutputWindow outputWindow2)
+                 continue;
+
+            outputWindow = outputWindow2;
+            return true;
+
+        }
+
+        outputWindow = null;
+        return false;
     }
 
-    public Texture2D GetCurrentTexture()
+    public Texture2D? GetCurrentTexture()
     {
-        return _imageCanvas?.LastTexture;
+        return _imageCanvas.LastTexture;
     }
 
     protected override void Close()
@@ -102,26 +118,28 @@ internal sealed class OutputWindow : Window
             // Draw output
             _imageCanvas.SetAsCurrent();
 
-            // Move down to avoid overlapping with toolbar
+            // Move down to avoid overlapping with the toolbar
             ImGui.SetCursorPos(ImGui.GetWindowContentRegionMin() + new Vector2(0, 40)); // this line as no effect?
 
-            var okay = Pinning.TryGetPinnedOrSelectedInstance(out var drawnInstance, out var graphCanvas);
+            Pinning.TryGetPinnedOrSelectedInstance(out var drawnInstance, out var graphCanvas);
 
             if (graphCanvas != null)
             {
-                Pinning.TryGetPinnedEvaluationInstance(graphCanvas?.Structure, out var evaluationInstance);
+                Pinning.TryGetPinnedEvaluationInstance(graphCanvas.Structure, out var evaluationInstance);
 
                 var drawnType = UpdateAndDrawOutput(drawnInstance, evaluationInstance);
                 ImageOutputCanvas.Deactivate();
                 _camSelectionHandling.Update(drawnInstance, drawnType);
-                var editingFlags = _camSelectionHandling.PreventCameraInteraction | _camSelectionHandling.PreventImageCanvasInteraction |
-                                   drawnType != typeof(Texture2D)
+                var editingFlags = _camSelectionHandling.PreventCameraInteraction 
+                                   | _camSelectionHandling.PreventImageCanvasInteraction
+                                   | SkillTraining.IsInPlayMode
+                                   | drawnType != typeof(Texture2D)
                                        ? T3Ui.EditingFlags.PreventMouseInteractions
                                        : T3Ui.EditingFlags.None;
 
                 if ((editingFlags & T3Ui.EditingFlags.PreventMouseInteractions) != 0)
                     T3Ui.UiScaleFactor = 1;
-
+                
                 _imageCanvas.Update(editingFlags);
 
                 T3Ui.UiScaleFactor = keepScale;
@@ -144,8 +162,13 @@ internal sealed class OutputWindow : Window
                 ImGui.PushStyleColor(ImGuiCol.ButtonHovered, UiColors.BackgroundHover.Rgba);
                 ImGui.PushStyleColor(ImGuiCol.ChildBg, Vector4.Zero);
                 ImGui.PushStyleColor(ImGuiCol.ScrollbarBg, new Vector4(0.3f, 0.3f, 0.3f, 0.1f));
-                DrawToolbar(drawnType);
-                DrawRenderProgressBar();
+
+                if (!SkillTraining.IsInPlayMode)
+                {
+                    DrawToolbar(drawnType);
+                    DrawRenderProgressBar();
+                }
+                
                 ImGui.PopStyleColor(6);
             }
 
@@ -154,16 +177,17 @@ internal sealed class OutputWindow : Window
         ImGui.EndChild();
     }
 
-    private void DrawToolbar(Type drawnType)
+    private void DrawToolbar(Type? drawnType)
     {
         // Set cursor to top of the window
         ImGui.SetCursorPos(ImGui.GetWindowContentRegionMin());
 
         // Calculate available width
         var availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
-
+        var toolbarHeight = ImGui.GetTextLineHeight() + 22;
+        
         // Begin a horizontally scrollable child region
-        ImGui.BeginChild("##toolbar_scroll", new Vector2(availableWidth, 40), false, ImGuiWindowFlags.HorizontalScrollbar);
+        ImGui.BeginChild("##toolbar_scroll", new Vector2(availableWidth, toolbarHeight), false, ImGuiWindowFlags.HorizontalScrollbar);
 
         Pinning.DrawPinning();
 
@@ -203,10 +227,10 @@ internal sealed class OutputWindow : Window
         {
             ImGui.SameLine();
 
-            var showGizmos = _evaluationContext.ShowGizmos != GizmoVisibility.Off;
+            var showGizmos = EvaluationContext.ShowGizmos != GizmoVisibility.Off;
             if (CustomComponents.ToggleIconButton(ref showGizmos, Icon.Grid, Vector2.One * ImGui.GetFrameHeight()))
             {
-                _evaluationContext.ShowGizmos = showGizmos
+                EvaluationContext.ShowGizmos = showGizmos
                                                     ? GizmoVisibility.On
                                                     : GizmoVisibility.Off;
             }
@@ -216,11 +240,11 @@ internal sealed class OutputWindow : Window
         }
 
         // Gizmo Transform mode
-        if (_evaluationContext.ShowGizmos != GizmoVisibility.Off)
+        if (EvaluationContext.ShowGizmos != GizmoVisibility.Off)
         {
             var size = Vector2.One * ImGui.GetFrameHeight(); // Calculate before pushing font
 
-            var icon = _evaluationContext.TransformGizmoMode switch
+            var icon = EvaluationContext.TransformGizmoMode switch
                            {
                                TransformGizmoModes.None   => "" + (char)Icon.Hidden,
                                TransformGizmoModes.Select => "" + (char)Icon.Pipette,
@@ -239,20 +263,20 @@ internal sealed class OutputWindow : Window
 
             if (ImGui.BeginPopup("_TransformGizmoSelection"))
             {
-                if (CustomComponents.DrawMenuItem((int)Icon.Move, "Move", isChecked: _evaluationContext.TransformGizmoMode == TransformGizmoModes.Move))
+                if (CustomComponents.DrawMenuItem((int)Icon.Move, "Move", isChecked: EvaluationContext.TransformGizmoMode == TransformGizmoModes.Move))
                 {
-                    _evaluationContext.TransformGizmoMode = TransformGizmoModes.Move;
+                    EvaluationContext.TransformGizmoMode = TransformGizmoModes.Move;
                 }
 
                 if (CustomComponents.DrawMenuItem((int)Icon.Rotate, "Rotate",
-                                                  isChecked: _evaluationContext.TransformGizmoMode == TransformGizmoModes.Rotate))
+                                                  isChecked: EvaluationContext.TransformGizmoMode == TransformGizmoModes.Rotate))
                 {
-                    _evaluationContext.TransformGizmoMode = TransformGizmoModes.Rotate;
+                    EvaluationContext.TransformGizmoMode = TransformGizmoModes.Rotate;
                 }
 
-                if (CustomComponents.DrawMenuItem((int)Icon.Scale, "Scale", isChecked: _evaluationContext.TransformGizmoMode == TransformGizmoModes.Scale))
+                if (CustomComponents.DrawMenuItem((int)Icon.Scale, "Scale", isChecked: EvaluationContext.TransformGizmoMode == TransformGizmoModes.Scale))
                 {
-                    _evaluationContext.TransformGizmoMode = TransformGizmoModes.Scale;
+                    EvaluationContext.TransformGizmoMode = TransformGizmoModes.Scale;
                 }
 
                 ImGui.EndPopup();
@@ -267,12 +291,12 @@ internal sealed class OutputWindow : Window
         {
             ImGui.SameLine();
             ImGui.PushID("CamSpeed");
-            var result = SingleValueEdit.Draw(ref UserSettings.Config.CameraSpeed, new Vector2(ImGui.GetFrameHeight() * 2, ImGui.GetFrameHeight()), min: 0.001f,
-                                              max: 100,
-                                              clampMin: true,
-                                              clampMax: true,
-                                              scale: 0.01f,
-                                              format: "    {0:G3}");
+            SingleValueEdit.Draw(ref UserSettings.Config.CameraSpeed, new Vector2(ImGui.GetFrameHeight() * 2, ImGui.GetFrameHeight()), min: 0.001f,
+                                 max: 100,
+                                 clampMin: true,
+                                 clampMax: true,
+                                 scale: 0.01f,
+                                 format: "    {0:G3}");
 
             Icons.DrawIconOnLastItem(Icon.CameraSpeed,
                                      Math.Abs(UserSettings.Config.CameraSpeed - UserSettings.Defaults.CameraSpeed) < 0.001f
@@ -333,7 +357,7 @@ internal sealed class OutputWindow : Window
                 }
                 else
                 {
-                    RenderProcess.TryStart(RenderSettings.Current);
+                    RenderProcess.TryStartVideoExport();
                 }
             }
 
@@ -361,12 +385,11 @@ internal sealed class OutputWindow : Window
     }
 
     /// <summary>
-    /// Update content with an <see cref="EvaluationContext"/> and use the DrawImplementation for the given type to draw it. 
+    /// Update content with an <see cref="Core.Operator.EvaluationContext"/> and use the DrawImplementation for the given type to draw it. 
     /// </summary>
-    private Type UpdateAndDrawOutput(Instance instanceForOutput, Instance instanceForEvaluation = null)
+    private Type? UpdateAndDrawOutput(Instance? instanceForOutput, Instance?instanceForEvaluation = null)
     {
-        if (instanceForEvaluation == null)
-            instanceForEvaluation = instanceForOutput;
+        instanceForEvaluation ??= instanceForOutput;
 
         if (instanceForEvaluation == null || instanceForEvaluation.Outputs.Count <= 0)
             return null;
@@ -374,7 +397,7 @@ internal sealed class OutputWindow : Window
         var evaluatedSymbolUi = instanceForEvaluation.GetSymbolUi();
         var evalOutput = Pinning.GetPinnedOrDefaultOutput(instanceForEvaluation.Outputs);
 
-        if (evalOutput == null || !evaluatedSymbolUi.OutputUis.TryGetValue(evalOutput.Id, out IOutputUi evaluatedOutputUi))
+        if (evalOutput == null || !evaluatedSymbolUi.OutputUis.TryGetValue(evalOutput.Id, out var evaluatedOutputUi))
             return null;
 
         if (_imageCanvas.ViewMode != ImageOutputCanvas.Modes.Fitted
@@ -384,32 +407,33 @@ internal sealed class OutputWindow : Window
         }
 
         // Prepare context
-        _evaluationContext.Reset();
-        _evaluationContext.BypassCameras = _camSelectionHandling.BypassCamera;
-        _evaluationContext.RequestedResolution = _selectedResolution.ComputeResolution();
+        EvaluationContext.Reset();
+        EvaluationContext.BypassCameras = _camSelectionHandling.BypassCamera;
+        EvaluationContext.RequestedResolution = RenderProcess.TryGetActiveExportResolution(out var overrideResolution) 
+                                                    ? overrideResolution 
+                                                    : _selectedResolution.ComputeResolution();
 
         // Set camera
         if (_camSelectionHandling.CameraForRendering != null)
         {
-            _evaluationContext.SetViewFromCamera(_camSelectionHandling.CameraForRendering);
+            EvaluationContext.SetViewFromCamera(_camSelectionHandling.CameraForRendering);
         }
 
-        _evaluationContext.BackgroundColor = _backgroundColor;
+        EvaluationContext.BackgroundColor = _backgroundColor;
 
         const string overrideSampleVariableName = "OverrideMotionBlurSamples";
 
-        if (RenderProcess.IsToollRenderingSomething)
+        if (RenderProcess.IsExporting)
         {
-            // FIXME: Implement
-            var samples = RenderSettings.Current.OverrideMotionBlurSamples;
+            var samples = RenderSettings.ForNextExport.OverrideMotionBlurSamples;
             if (samples >= 0)
             {
-                _evaluationContext.IntVariables[overrideSampleVariableName] = samples;
+                EvaluationContext.IntVariables[overrideSampleVariableName] = samples;
             }
         }
         else
         {
-            _evaluationContext.IntVariables.Remove(overrideSampleVariableName);
+            EvaluationContext.IntVariables.Remove(overrideSampleVariableName);
         }
 
         // Ugly hack to hide final target
@@ -417,7 +441,7 @@ internal sealed class OutputWindow : Window
         {
             ImGui.BeginChild("hidden", Vector2.One);
             {
-                evaluatedOutputUi.DrawValue(evalOutput, _evaluationContext, Config.Title);
+                evaluatedOutputUi.DrawValue(evalOutput, EvaluationContext, Config.Title);
             }
             ImGui.EndChild();
 
@@ -427,22 +451,20 @@ internal sealed class OutputWindow : Window
             var viewOutput = Pinning.GetPinnedOrDefaultOutput(instanceForOutput.Outputs);
 
             var viewSymbolUi = instanceForOutput.GetSymbolUi();
-            if (viewOutput == null || !viewSymbolUi.OutputUis.TryGetValue(viewOutput.Id, out IOutputUi viewOutputUi))
+            if (viewOutput == null || !viewSymbolUi.OutputUis.TryGetValue(viewOutput.Id, out var viewOutputUi))
                 return null;
 
             // Render!
-            viewOutputUi.DrawValue(viewOutput, _evaluationContext, Config.Title, recompute: false);
+            viewOutputUi.DrawValue(viewOutput, EvaluationContext, Config.Title, recompute: false);
             return viewOutputUi.Type;
         }
-        else
-        {
-            // Render!
-            evaluatedOutputUi.DrawValue(evalOutput, _evaluationContext, Config.Title);
-            return evalOutput.ValueType;
-        }
+
+        // Render!
+        evaluatedOutputUi.DrawValue(evalOutput, EvaluationContext, Config.Title);
+        return evalOutput.ValueType;
     }
 
-    public Instance ShownInstance
+    public Instance? ShownInstance
     {
         get
         {
@@ -451,11 +473,11 @@ internal sealed class OutputWindow : Window
         }
     }
 
-    public static readonly List<Window> OutputWindowInstances = new();
+    public static readonly List<Window> OutputWindowInstances = [];
     public ViewSelectionPinning Pinning { get; } = new();
 
     private System.Numerics.Vector4 _backgroundColor = new(0.1f, 0.1f, 0.1f, 1.0f);
-    private readonly EvaluationContext _evaluationContext = new();
+    internal readonly EvaluationContext EvaluationContext = new();
     private readonly ImageOutputCanvas _imageCanvas = new();
     private readonly CameraSelectionHandling _camSelectionHandling;
     private static int _instanceCounter;

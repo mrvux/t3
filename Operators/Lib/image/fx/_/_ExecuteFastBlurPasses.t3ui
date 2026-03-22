@@ -1,0 +1,70 @@
+{
+  "Id": "46ce6fad-87fe-4d1f-b236-ae644dd1f76c"/*_ExecuteFastBlurPasses*/,
+  "Description": "An internal operator that performs the necessary steps of the bloom effect.",
+  "InputUis": [
+    {
+      "InputId": "5d19c8be-7ea0-4b8d-5f3d-9ebb3a914b8d"/*LinearSampler*/,
+      "Relevancy": "Required",
+      "Position": {
+        "X": -200.0,
+        "Y": 900.0
+      }
+    },
+    {
+      "InputId": "692bc2f0-68f2-45ca-a0fb-cd1c5d08e982"/*SourceTexture*/,
+      "Relevancy": "Required",
+      "Position": {
+        "X": -200.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "InputId": "7f79b69a-5dd8-4c49-9b60-2a2d4c2b5a0f"/*Steps*/,
+      "Relevancy": "Required",
+      "Position": {
+        "X": -200.0,
+        "Y": 300.0
+      }
+    },
+    {
+      "InputId": "98e88d02-3b78-403c-b9c9-b5ecf8565acd"/*SourceTextureSrv*/,
+      "Relevancy": "Required",
+      "Position": {
+        "X": -200.0,
+        "Y": 75.0
+      }
+    },
+    {
+      "InputId": "b82c9d56-19d6-4d2b-9e6f-1a1b1cbe9a25"/*UpsampleBlurPS*/,
+      "Position": {
+        "X": -200.0,
+        "Y": 750.0
+      }
+    },
+    {
+      "InputId": "d0b64c21-46c5-45a3-9f68-2e7b2b2cf3a1"/*DownsampleBlurPS*/,
+      "Position": {
+        "X": -200.0,
+        "Y": 675.0
+      }
+    },
+    {
+      "InputId": "e6a25147-0739-4416-e8c6-2745c32ad416"/*FullscreenVS*/,
+      "Relevancy": "Required",
+      "Position": {
+        "X": -200.0,
+        "Y": 600.0
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "6d01b25b-0b2f-4e92-9b5e-0f6d69f2cf5b"/*OutputTexture*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 200.0
+      }
+    }
+  ]
+}

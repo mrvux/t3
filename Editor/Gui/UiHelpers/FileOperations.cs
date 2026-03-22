@@ -83,7 +83,7 @@ public static class FileOperations
         if (type == FilePickerTypes.File)
         {
             ImGui.SameLine();
-            if (ImGui.Button("Edit", new Vector2(40, 0)))
+            if (ImGui.Button("Edit", new Vector2(40, 0) * T3Ui.UiScaleFactor))
             {
                 if (!File.Exists(value))
                 {
@@ -110,12 +110,12 @@ public static class FileOperations
 
     private static string GetAbsoluteResourcePath()
     {
-        return Path.Combine(Path.GetFullPath("."), FileLocations.ResourcesSubfolder);
+        return Path.Combine(Path.GetFullPath("."), FileLocations.AssetsSubfolder);
     }
 
     private static string GetAbsoluteDirectory(string relativeFilepath)
     {
         var absolutePath = GetAbsoluteResourcePath();
-        return Path.GetDirectoryName(Path.Combine(absolutePath, relativeFilepath.Replace(FileLocations.ResourcesSubfolder + "\\", "")));
+        return Path.GetDirectoryName(Path.Combine(absolutePath, relativeFilepath.Replace(FileLocations.AssetsSubfolder + "\\", "")));
     }
 }

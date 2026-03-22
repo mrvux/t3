@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -92,6 +92,21 @@ internal sealed class AppWindow
         Form.WindowState = FormWindowState.Normal;
         Form.FormBorderStyle = FormBorderStyle.None;
         Form.Bounds = Screen.AllScreens[screenIndex].Bounds;
+  
+    }
+
+    internal void UpdateSpanningBounds(int x, int y, int width, int height)
+    {
+        if (Form.FormBorderStyle == FormBorderStyle.None)
+        {
+            Form.Bounds = new Rectangle(x, y, width, height);
+        }
+        else
+        {
+            _boundsBeforeFullscreen = Form.Bounds;
+            Form.FormBorderStyle = FormBorderStyle.None;
+            Form.Bounds = new Rectangle(x, y, width, height);
+        }
     }
 
     internal void InitViewSwapChain(Factory factory)
@@ -155,7 +170,7 @@ internal sealed class AppWindow
 
     private void CreateRenderForm(string windowTitle, bool disableClose)
     {
-        var fileName = Path.Combine(SharedResources.Directory, @"images/editor/t3.ico");
+        var fileName = Path.Combine(SharedResources.EditorResourcesDirectory, SharedResources.EditorResourcesDirectory, "images", "t3.ico");
         Form = disableClose
                    ? new NoCloseRenderForm(windowTitle)
                          {

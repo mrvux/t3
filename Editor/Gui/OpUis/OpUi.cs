@@ -101,19 +101,24 @@ public static class OpUi
                   { Guid.Parse("0bec016a-5e1b-467a-8273-368d4d6b9935"), TriggerUi.DrawChildUi },
                   //
                   { Guid.Parse("03477b9a-860e-4887-81c3-5fe51621122c"), AudioReactionUi.DrawChildUi },
+                  { Guid.Parse("c8d9e0f1-a2b3-4c5d-6e7f-8a9b0c1d2e3f"), AdsrEnvelopeUi.DrawChildUi },
                   // { Guid.Parse("000e08d0-669f-48df-9083-7aa0a43bbc05"), GpuMeasureUi.DrawChildUi },
                   // { Guid.Parse("bfe540ef-f8ad-45a2-b557-cd419d9c8e44"), DataListUi.DrawChildUi },
                   //
                   { Guid.Parse("470db771-c7f2-4c52-8897-d3a9b9fc6a4e"), GetIntVarUi.DrawChildUi },
+                  { Guid.Parse("7953f704-ebee-498b-8bdd-a2c201dfe278"), SetIntVarUi.DrawChildUi },
                   
                   { Guid.Parse("e6072ecf-30d2-4c52-afa1-3b195d61617b"), GetFloatVarUi.DrawChildUi },
                   { Guid.Parse("2a0c932a-eb81-4a7d-aeac-836a23b0b789"), SetFloatVarUi.DrawChildUi },
                   
+                  { Guid.Parse("15012739-97b0-49e6-8bdc-cd45cd262560"), GetStringVarUi.DrawChildUi },
+                  { Guid.Parse("9c9274c1-3f85-4f57-9eb5-1e0a0b1cce00"), SetStringVarUi.DrawChildUi },
+                  
                   { Guid.Parse("9a843835-d39c-428f-b996-6334323e8106"), SetBoolVarUi.DrawChildUi },
                   { Guid.Parse("604bfb46-fe8f-4c8b-896b-1b7bc827137b"), GetBoolVarUi.DrawChildUi },
 
-                  { Guid.Parse("fdad077d-e919-4f40-a154-36e86245a585"), SetVec3Ui.DrawChildUi },
-                  { Guid.Parse("f21de2e1-6af8-4651-90a0-6c662bbb23af"), GetVec3Ui.DrawChildUi },
+                  { Guid.Parse("fdad077d-e919-4f40-a154-36e86245a585"), SetVec3VarUi.DrawChildUi },
+                  { Guid.Parse("f21de2e1-6af8-4651-90a0-6c662bbb23af"), GetVec3VarUi.DrawChildUi },
 
                   { Guid.Parse("e6070817-cf2e-4430-87e0-bf3dd15afdb5"), PickTextureUi.DrawChildUi },
                   //

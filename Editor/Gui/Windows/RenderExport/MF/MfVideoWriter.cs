@@ -16,9 +16,15 @@ using T3.Core.Resource;
 
 namespace T3.Editor.Gui.Windows.RenderExport.MF;
 
+/// <summary>
+/// Abstract base class for writing video files using Media Foundation.
+/// Handles video and optional audio stream setup, frame processing, and resource management.
+/// </summary>
 internal abstract class MfVideoWriter : IDisposable
 {
-    private MfVideoWriter(string filePath, Int2 videoPixelSize, Guid videoInputFormat, bool supportAudio = false)
+    private readonly Int2 _videoPixelSize;
+
+    protected MfVideoWriter(RenderProcess.ExportSession session)
     {
         if (!_mfInitialized)
         {
@@ -28,25 +34,22 @@ internal abstract class MfVideoWriter : IDisposable
         }
 
         // Set initial default values
-        FilePath = filePath;
-        _videoPixelSize = videoPixelSize;
-        _videoInputFormat = videoInputFormat;
-        _supportAudio = supportAudio;
-        Bitrate = 2000000;
-        Framerate = 60; //TODO: is this actually used?
+        FilePath = session.TargetFilePath;
+        _videoPixelSize = session.RenderToFileResolution;
+        _videoInputFormat = _videoInputFormatId;
+        _supportAudio = session.Settings.ExportAudio;
+        Bitrate = session.Settings.Bitrate;
+        Framerate =  (int)(session.Settings.FrameRate +0.5f);   // Is this used? 
         _frameIndex = -1;
-    }    
-    
-    public string FilePath { get; }
+    }
+
+    private string FilePath { get; }
 
     // skip a certain number of images at the beginning since the
     // final content will only appear after several buffer flips
     public const int SkipImages = 1;
 
-    protected MfVideoWriter(string filePath, Int2 videoPixelSize, bool supportAudio = false)
-        : this(filePath, videoPixelSize, _videoInputFormatId, supportAudio)
-    {
-    }
+
 
     public static readonly List<SharpDX.DXGI.Format> SupportedFormats = new List<SharpDX.DXGI.Format>
         { SharpDX.DXGI.Format.R8G8B8A8_UNorm };
@@ -54,7 +57,12 @@ internal abstract class MfVideoWriter : IDisposable
     /// <summary>
     /// Returns true if a frame has been written
     /// </summary>
-    public bool ProcessFrames( Texture2D gpuTexture, ref byte[] audioFrame, int channels, int sampleRate)
+    /// <param name="gpuTexture">The GPU texture containing the video frame.</param>
+    /// <param name="audioFrame">Reference to the audio frame buffer.</param>
+    /// <param name="channels">Number of audio channels.</param>
+    /// <param name="sampleRate">Audio sample rate.</param>
+    /// <returns>True if the frame was written successfully; otherwise, false.</returns>
+    public bool ProcessFrames(Texture2D gpuTexture, ref byte[] audioFrame, int channels, int sampleRate)
     {
         try
         {
@@ -68,7 +76,7 @@ internal abstract class MfVideoWriter : IDisposable
             {
                 throw new InvalidOperationException("Empty image handed over");
             }
-
+            
             // Setup writer
             if (SinkWriter == null)
             {
@@ -171,19 +179,23 @@ internal abstract class MfVideoWriter : IDisposable
 
 
 
+    /// <summary>
+    /// Saves the sample after the texture readback is complete.
+    /// </summary>
+    /// <param name="readRequestItem">The read request item containing the CPU access texture.</param>
     private void SaveSampleAfterReadback(TextureBgraReadAccess.ReadRequestItem readRequestItem)
     {
         if (_lastSample != null)
         {
-             Log.Warning("Discarding previous video sample...");
-             _lastSample?.Dispose();
-             _lastSample = null;
+            Log.Warning("Discarding previous video sample...");
+            _lastSample?.Dispose();
+            _lastSample = null;
         }
 
         var cpuAccessTexture = readRequestItem.CpuAccessTexture;
         if (cpuAccessTexture == null || cpuAccessTexture.IsDisposed)
             return;
-        
+
         // Map image resource to get a stream we can read from
         var dataBox = ResourceManager.Device.ImmediateContext.MapSubresource(cpuAccessTexture,
                                                                              0,
@@ -243,10 +255,15 @@ internal abstract class MfVideoWriter : IDisposable
         // Create the sample (includes image and timing information)
         _lastSample = MediaFactory.CreateSample();
         _lastSample.AddBuffer(mediaBuffer);
-        
+
         mediaBuffer.Dispose();
     }
 
+    /// <summary>
+    /// Creates a SinkWriter for the specified output file.
+    /// </summary>
+    /// <param name="outputFile">The output file path.</param>
+    /// <returns>A new SinkWriter instance.</returns>
     private static SinkWriter CreateSinkWriter(string outputFile)
     {
         SinkWriter writer;
@@ -272,9 +289,10 @@ internal abstract class MfVideoWriter : IDisposable
 
 
     /// <summary>
-    /// get minimum image buffer size in bytes if imager is RGBA converted
+    /// Gets the minimum image buffer size in bytes for an RGBA texture.
     /// </summary>
-    /// <param name="frame">texture to get information from</param>
+    /// <param name="frame">The texture to get information from.</param>
+    /// <returns>The buffer size in bytes.</returns>
     public static int RgbaSizeInBytes(ref Texture2D frame)
     {
         var currentDesc = frame.Description;
@@ -284,6 +302,11 @@ internal abstract class MfVideoWriter : IDisposable
 
 
     // FIXME: Would possibly need some refactoring not to duplicate code from ScreenshotWriter
+    /// <summary>
+    /// Reads two bytes from the image stream and converts them to a half-precision float.
+    /// </summary>
+    /// <param name="imageStream">The image data stream.</param>
+    /// <returns>The half-precision float value.</returns>
     private static float Read2BytesToHalf(DataStream imageStream)
     {
         var low = (byte)imageStream.ReadByte();
@@ -291,6 +314,10 @@ internal abstract class MfVideoWriter : IDisposable
         return FormatConversion.ToTwoByteFloat(low, high);
     }
 
+    /// <summary>
+    /// Writes the provided video and audio samples to the output stream.
+    /// </summary>
+    /// <param name="samples">A dictionary mapping stream indices to samples.</param>
     private void WriteSamples(Dictionary<int, Sample> samples)
     {
         ++_frameIndex;
@@ -312,22 +339,21 @@ internal abstract class MfVideoWriter : IDisposable
     }
 
     /// <summary>
-    /// Creates a media target.
+    /// Creates a media target for the video stream.
     /// </summary>
-    /// <param name="sinkWriter">The previously created SinkWriter.</param>
+    /// <param name="sinkWriter">The SinkWriter instance.</param>
     /// <param name="videoPixelSize">The pixel size of the video.</param>
-    /// <param name="streamIndex">The stream index for the new target.</param>
+    /// <param name="streamIndex">The output stream index.</param>
     protected abstract void CreateMediaTarget(SinkWriter sinkWriter, Int2 videoPixelSize, out int streamIndex);
 
     /// <summary>
-    /// Internal use: FlipY during rendering?
+    /// Gets a value indicating whether the video should be vertically flipped during rendering.
     /// </summary>
     protected virtual bool FlipY => false;
 
-    public int Bitrate { get; set; }
-    public int Framerate { get; set; }
-
-    #region IDisposable Support
+    /// <summary>
+    /// Releases resources used by the video writer and finalizes the output file.
+    /// </summary>
     public void Dispose()
     {
         if (SinkWriter != null)
@@ -336,7 +362,7 @@ internal abstract class MfVideoWriter : IDisposable
             try
             {
                 SinkWriter.NotifyEndOfSegment(_streamIndex);
-                if (_frameIndex > 0)
+                if (_frameIndex >= 0)
                 {
                     SinkWriter.Finalize();
                 }
@@ -352,14 +378,9 @@ internal abstract class MfVideoWriter : IDisposable
             }
         }
     }
-    #endregion
 
-
-    
     #region Resources for MediaFoundation video rendering
     private Sample _lastSample;
-    // private MF.ByteStream outStream;
-    private readonly Int2 _videoPixelSize;
     private int _frameIndex;
     private int _streamIndex;
     #endregion
@@ -370,20 +391,42 @@ internal abstract class MfVideoWriter : IDisposable
     private MediaFoundationAudioWriter _audioWriter;
 
     private static readonly Guid _videoInputFormatId = VideoFormatGuids.Rgb32;
-    private bool _supportAudio;
+    private readonly bool _supportAudio;
     private static bool _mfInitialized = false;
     private readonly Guid _videoInputFormat;
+
+    /// <summary>
+    /// Gets or sets the average video bitrate in bits per second.
+    /// </summary>
+    protected readonly int Bitrate;
+
+    /// <summary>
+    /// Gets or sets the video framerate (frames per second).
+    /// </summary>
+    protected readonly int Framerate;
 }
 
+/// <summary>
+/// Concrete implementation of MfVideoWriter for writing MP4 (H.264) video files.
+/// </summary>
 internal sealed class Mp4VideoWriter : MfVideoWriter
 {
     private static readonly Guid _h264EncodingFormatId = VideoFormatGuids.H264;
 
-    public Mp4VideoWriter(string filePath, Int2 videoPixelSize, bool supportAudio = false)
-        : base(filePath, videoPixelSize, supportAudio)
+    /// <summary>
+    /// Initializes a new instance of the Mp4VideoWriter class.
+    /// </summary>
+    public Mp4VideoWriter(RenderProcess.ExportSession session)
+        : base(session)
     {
     }
 
+    /// <summary>
+    /// Creates the media target for the MP4 video stream.
+    /// </summary>
+    /// <param name="sinkWriter">The SinkWriter instance.</param>
+    /// <param name="videoPixelSize">The pixel size of the video.</param>
+    /// <param name="streamIndex">The output stream index.</param>
     protected override void CreateMediaTarget(SinkWriter sinkWriter, Int2 videoPixelSize, out int streamIndex)
     {
         using var mediaTypeOut = new MediaType();
@@ -397,7 +440,7 @@ internal sealed class Mp4VideoWriter : MfVideoWriter
     }
 
     /// <summary>
-    /// Internal use: FlipY during rendering?
+    /// Gets a value indicating whether the video should be vertically flipped during rendering (always true for MP4).
     /// </summary>
     protected override bool FlipY => true;
 }

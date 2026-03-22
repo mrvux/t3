@@ -101,11 +101,6 @@
       "SymbolId": "f90fcd0a-eab9-4e2a-b393-e8d3a0380823",
       "InputValues": [
         {
-          "Id": "ca9778e7-072c-4304-9043-eeb2dc4ca5d7"/*Folder*/,
-          "Type": "System.String",
-          "Value": "C:\\Users\\pixtur\\Downloads\\PhotoWall"
-        },
-        {
           "Id": "e14a4aae-e253-4d14-80ef-a90271cd306a"/*TriggerUpdate*/,
           "Type": "System.Boolean",
           "Value": false
@@ -196,7 +191,7 @@
       "Outputs": []
     },
     {
-      "Id": "5b5d2cb3-e05e-44dd-94a2-4cbe26f8551c"/*PickFromStringList*/,
+      "Id": "5b5d2cb3-e05e-44dd-94a2-4cbe26f8551c"/*PickStringFromList*/,
       "SymbolId": "ef357e66-24e9-4f54-8d86-869db74602f4",
       "InputValues": [],
       "Outputs": []

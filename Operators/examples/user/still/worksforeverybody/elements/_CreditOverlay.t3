@@ -162,7 +162,7 @@
       "Outputs": []
     },
     {
-      "Id": "26936710-b4ad-438b-aa42-a9210e5ed92c"/*PickFromStringList*/,
+      "Id": "26936710-b4ad-438b-aa42-a9210e5ed92c"/*PickStringFromList*/,
       "SymbolId": "ef357e66-24e9-4f54-8d86-869db74602f4",
       "InputValues": [
         {
@@ -192,7 +192,7 @@
         {
           "Id": "50c9ab21-39f4-4e92-b5a7-ad9e60ae6ec3"/*FontPath*/,
           "Type": "System.String",
-          "Value": "Resources\\fonts\\Roboto-Regular.fnt"
+          "Value": "Examples:fonts/Roboto-Regular.fnt"
         },
         {
           "Id": "82cc31ff-3307-4b6d-be70-16e471c2ffc9"/*HorizontalAlign*/,
@@ -227,7 +227,7 @@
       "Outputs": []
     },
     {
-      "Id": "5068b94a-c01e-4148-b86f-65ac4eb34c7b"/*SetIntVariable*/,
+      "Id": "5068b94a-c01e-4148-b86f-65ac4eb34c7b"/*SetIntVar*/,
       "SymbolId": "7953f704-ebee-498b-8bdd-a2c201dfe278",
       "InputValues": [
         {
@@ -256,7 +256,7 @@
         {
           "Id": "50c9ab21-39f4-4e92-b5a7-ad9e60ae6ec3"/*FontPath*/,
           "Type": "System.String",
-          "Value": "Resources\\fonts\\Roboto-Regular.fnt"
+          "Value": "Examples:fonts/Roboto-Regular.fnt"
         },
         {
           "Id": "82cc31ff-3307-4b6d-be70-16e471c2ffc9"/*HorizontalAlign*/,
@@ -336,7 +336,7 @@
       "Outputs": []
     },
     {
-      "Id": "876b7c15-956c-4ba9-8ba9-43af95d160ca"/*PickFromStringList*/,
+      "Id": "876b7c15-956c-4ba9-8ba9-43af95d160ca"/*PickStringFromList*/,
       "SymbolId": "ef357e66-24e9-4f54-8d86-869db74602f4",
       "InputValues": [],
       "Outputs": []
@@ -410,7 +410,7 @@
         {
           "Id": "50c9ab21-39f4-4e92-b5a7-ad9e60ae6ec3"/*FontPath*/,
           "Type": "System.String",
-          "Value": "Resources\\fonts\\Roboto-Regular.fnt"
+          "Value": "Examples:fonts/Roboto-Regular.fnt"
         },
         {
           "Id": "82cc31ff-3307-4b6d-be70-16e471c2ffc9"/*HorizontalAlign*/,
@@ -593,7 +593,7 @@
       "Outputs": []
     },
     {
-      "Id": "d16b97ac-7aee-4836-92cd-15ede98f8207"/*PickFromStringList*/,
+      "Id": "d16b97ac-7aee-4836-92cd-15ede98f8207"/*PickStringFromList*/,
       "SymbolId": "ef357e66-24e9-4f54-8d86-869db74602f4",
       "InputValues": [
         {

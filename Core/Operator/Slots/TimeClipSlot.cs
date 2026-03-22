@@ -42,7 +42,7 @@ public sealed class TimeClipSlot<T> : Slot<T>, ITimeClipProvider, IOutputDataUse
 
     public void SetOutputData(IOutputData data)
     {
-        TimeClip = (TimeClip)data;
+        TimeClip = data as TimeClip ?? new TimeClip();
         TimeClip.Id = Parent.SymbolChildId;
         TimeClip.UsedForRegionMapping = Parent is not IPreventingTimeRemap;
     }
@@ -125,7 +125,7 @@ public sealed class TimeClipSlot<T> : Slot<T>, ITimeClipProvider, IOutputDataUse
         // Slot is an output of a composition op
         if (HasInputConnections)
         {
-            return InputConnections[0].Invalidate();
+            return InputConnections[0].InvalidateGraph();
         }
 
         if (LastUpdateStatus == UpdateStates.Suspended)
@@ -142,7 +142,7 @@ public sealed class TimeClipSlot<T> : Slot<T>, ITimeClipProvider, IOutputDataUse
             var inputDirtyFlag = inputSlot.DirtyFlag;
             if (inputSlot.TryGetFirstConnection(out var inputSlotConnection))
             {
-                inputDirtyFlag.Target = inputSlotConnection.Invalidate();
+                inputDirtyFlag.SourceVersion = inputSlotConnection.InvalidateGraph();
             }
             else if (inputDirtyFlag.TriggerIsAnimated)
             {
@@ -153,6 +153,6 @@ public sealed class TimeClipSlot<T> : Slot<T>, ITimeClipProvider, IOutputDataUse
             isOutputDirty |= inputDirtyFlag.IsDirty;
         }
 
-        return isOutputDirty ? _dirtyFlag.Invalidate() : _dirtyFlag.Target;
+        return isOutputDirty ? _dirtyFlag.Invalidate() : _dirtyFlag.SourceVersion;
     }
 }

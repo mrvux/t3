@@ -1,0 +1,11 @@
+{
+  "Id": "5b911a78-8cad-4dbd-9f74-afccb0cb0787"/*AbsoluteSDF*/,
+  "Inputs": [
+    {
+      "Id": "e60a6857-2be5-4236-b506-43c9e84b8d1e"/*InputField*/,
+      "DefaultValue": null
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}

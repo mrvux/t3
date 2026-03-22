@@ -15,7 +15,8 @@ namespace T3.Editor.Gui.MagGraph.Ui;
 
 internal sealed partial class MagGraphView
 {
-    private Dictionary<int, (Vector2 source, Vector2 target)> _previousConnectionPositions = new();
+    private readonly Dictionary<int, (Vector2 source, Vector2 target)> _previousConnectionPositions = new();
+    
     public void DrawGraph(ImDrawListPtr drawList, float graphOpacity)
     {
         _context.GraphOpacity = graphOpacity;
@@ -27,7 +28,7 @@ internal sealed partial class MagGraphView
 
         if (result == ChangeSymbol.SymbolModificationResults.Nothing)
         {
-            result |= KeyboardActions.HandleKeyboardActions(_context);
+            KeyboardActions.HandleKeyboardActions(_context);
         }
 
         if (_context.ProjectView.InstView is not { IsValid: true })
@@ -36,12 +37,12 @@ internal sealed partial class MagGraphView
         }
         else
         {
-            HandleSymbolDropping(_context);
+            DropHandling.HandleDropOnWindow(_context);
 
             // Update view scope if required
             if (FitViewToSelectionHandling.FitViewToSelectionRequested)
             {
-                FocusViewToSelection(_context);
+                _context.ProjectView.FocusViewToSelection();
             }
 
             // Keep visible canvas area to cull non-visible objects later
@@ -58,15 +59,12 @@ internal sealed partial class MagGraphView
                 UpdateCanvas(out _, editingFlags);
 
             // Store previous connection lines damped positions before layout recomputes
-            if (_context.Layout.MagConnections != null)
+            _previousConnectionPositions.Clear();
+            foreach (var c in _context.Layout.MagConnections)
             {
-                _previousConnectionPositions.Clear();
-                foreach (var c in _context.Layout.MagConnections)
+                if (c.DampedSourcePos != Vector2.Zero || c.DampedTargetPos != Vector2.Zero)
                 {
-                    if (c.DampedSourcePos != Vector2.Zero || c.DampedTargetPos != Vector2.Zero)
-                    {
-                        _previousConnectionPositions[c.ConnectionHash] = (c.DampedSourcePos, c.DampedTargetPos);
-                    }
+                    _previousConnectionPositions[c.ConnectionHash] = (c.DampedSourcePos, c.DampedTargetPos);
                 }
             }
 
@@ -291,8 +289,7 @@ internal sealed partial class MagGraphView
     private void InvalidateSelectedGizmoProviders(MagGraphItem item)
     {
         if (item.Variant == MagGraphItem.Variants.Operator
-            && item.Instance is ITransformable transformable
-            && _context.Selector.IsSelected(item)
+            && item.Instance is ITransformable && _context.Selector.IsSelected(item)
             && item.Instance.Inputs.Count > 0)
         {
             item.Instance.Inputs[0].DirtyFlag.ForceInvalidate();
@@ -309,7 +306,7 @@ internal sealed partial class MagGraphView
 
     private void SmoothItemPositions()
     {
-        const float dampAmount = 0.7f;
+        const float dampAmount = 0.33f;
 
         foreach (var i in _context.Layout.Items.Values)
         {
@@ -366,12 +363,12 @@ internal sealed partial class MagGraphView
             }
             else
             {
-                center.X += sp.DragPositionWithinBlock.X * CanvasScale;
-                var offset = MagGraphItem.GridSize.Y * 0.25f * CanvasScale;
-                drawList.AddRectFilled(center + new Vector2(0, -offset),
-                                       center + new Vector2(2, offset),
-                                       ColorVariations.ConnectionLines.Apply(typeColor).Fade(Blink)
-                                      );
+                // center.X += sp.DragPositionWithinBlock.X * CanvasScale;
+                // var offset = MagGraphItem.GridSize.Y * 0.25f * CanvasScale;
+                // drawList.AddRectFilled(center + new Vector2(0, -offset),
+                //                        center + new Vector2(2, offset),
+                //                        ColorVariations.ConnectionLines.Apply(typeColor).Fade(Blink)
+                //                       );
             }
         }
     }
@@ -382,14 +379,14 @@ internal sealed partial class MagGraphView
         var gridSize = Vector2.One * minSize;
         var maxOpacity = 0.25f;
 
-        var fineGrid = MathUtils.RemapAndClamp(Scale.X, 0.5f, 2f, 0.0f, maxOpacity);
+        var fineGrid = Scale.X.RemapAndClamp(0.5f, 2f, 0.0f, maxOpacity);
         if (fineGrid > 0.01f)
         {
             var color = UiColors.CanvasGrid.Fade(fineGrid);
             DrawBackgroundGrid(drawList, gridSize, color);
         }
 
-        var roughGrid = MathUtils.RemapAndClamp(Scale.X, 0.1f, 2f, 0.0f, maxOpacity);
+        var roughGrid = Scale.X.RemapAndClamp(0.1f, 2f, 0.0f, maxOpacity);
         if (roughGrid > 0.01f)
         {
             var color = UiColors.CanvasGrid.Fade(roughGrid);

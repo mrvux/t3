@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -19,7 +19,7 @@ public sealed class PlaybackSettings
 {
     public bool Enabled { get; set; }
     public float Bpm = 120;
-    public List<AudioClipDefinition> AudioClips { get; private init; } = [];
+    public List<SoundtrackClipDefinition> AudioClips { get; private init; } = [];
     public AudioSources AudioSource;
     public SyncModes Syncing;
 
@@ -117,15 +117,15 @@ public sealed class PlaybackSettings
         var newSettings = new PlaybackSettings
                               {
                                   AudioClips = clips,
-                                  Enabled = JsonUtils.ReadToken(settingsToken, nameof(Enabled), false),
-                                  Bpm = JsonUtils.ReadToken(settingsToken, nameof(Bpm), 120f),
+                                  Enabled = JsonUtils.ReadValueSafe(settingsToken, nameof(Enabled), false),
+                                  Bpm = JsonUtils.ReadValueSafe(settingsToken, nameof(Bpm), 120f),
                                   AudioSource = JsonUtils.ReadEnum<AudioSources>(settingsToken, nameof(AudioSource)),
                                   Syncing = JsonUtils.ReadEnum<SyncModes>(settingsToken, nameof(Syncing)),
-                                  AudioDecayFactor = JsonUtils.ReadToken(settingsToken, nameof(AudioDecayFactor), 0.5f),
-                                  AudioGainFactor = JsonUtils.ReadToken(settingsToken, nameof(AudioGainFactor), 1f),
-                                  AudioInputDeviceName = JsonUtils.ReadToken<string>(settingsToken, nameof(AudioInputDeviceName))?? string.Empty,
-                                  EnableAudioBeatLocking = JsonUtils.ReadToken(settingsToken, nameof(EnableAudioBeatLocking), false),
-                                  BeatLockAudioOffsetSec = JsonUtils.ReadToken(settingsToken, nameof(BeatLockAudioOffsetSec), 0f),
+                                  AudioDecayFactor = JsonUtils.ReadValueSafe(settingsToken, nameof(AudioDecayFactor), 0.5f),
+                                  AudioGainFactor = JsonUtils.ReadValueSafe(settingsToken, nameof(AudioGainFactor), 1f),
+                                  AudioInputDeviceName = JsonUtils.ReadValueSafe<string>(settingsToken, nameof(AudioInputDeviceName))?? string.Empty,
+                                  EnableAudioBeatLocking = JsonUtils.ReadValueSafe(settingsToken, nameof(EnableAudioBeatLocking), false),
+                                  BeatLockAudioOffsetSec = JsonUtils.ReadValueSafe(settingsToken, nameof(BeatLockAudioOffsetSec), 0f),
                               };
 
         newSettings.AudioClips.AddRange(GetClips(settingsToken)); // Support correct format
@@ -143,7 +143,7 @@ public sealed class PlaybackSettings
         return newSettings;
     }
 
-    private static IEnumerable<AudioClipDefinition> GetClips(JToken settingsToken)
+    private static IEnumerable<SoundtrackClipDefinition> GetClips(JToken settingsToken)
     {
         var jClipsToken = settingsToken[nameof(Symbol.PlaybackSettings.AudioClips)];
         if(jClipsToken == null)
@@ -152,7 +152,7 @@ public sealed class PlaybackSettings
         var jAudioClipArray = (JArray)jClipsToken;
         foreach (var c in jAudioClipArray)
         {
-            if (AudioClipDefinition.TryFromJson(c, out var clip))
+            if (SoundtrackClipDefinition.TryFromJson(c, out var clip))
             {
                 yield return clip;
             }

@@ -25,7 +25,7 @@
         {
           "Id": "50c9ab21-39f4-4e92-b5a7-ad9e60ae6ec3"/*FontPath*/,
           "Type": "System.String",
-          "Value": "Resources\\fonts\\RobotoSlab-Black.fnt"
+          "Value": "Examples:fonts/RobotoSlab-Black.fnt"
         },
         {
           "Id": "d89c518c-a862-4f46-865b-0380350b7417"/*Size*/,
@@ -171,7 +171,7 @@
           "Value": true
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotate*/,
           "Type": "System.Single",
           "Value": -45.0
         },
@@ -384,11 +384,6 @@
           "Id": "b4895a95-5ff4-4583-9ec3-befcf0f7b18b"/*B*/,
           "Type": "System.Single",
           "Value": 13.2
-        },
-        {
-          "Id": "fb8d51fe-b4c2-452a-9e53-b649aed92bd7"/*IgnoreTemplate*/,
-          "Type": "System.Boolean",
-          "Value": false
         }
       ],
       "Outputs": []
@@ -809,7 +804,7 @@
         {
           "Id": "24b7e7e1-fe0b-46be-807e-0afacd4800f9"/*FilePath*/,
           "Type": "System.String",
-          "Value": "Resources\\user\\still\\proj-works-for-everybody\\shader\\StripePattern.hlsl"
+          "Value": "Examples:Resources/user/still/proj-works-for-everybody/shader/StripePattern.hlsl"
         },
         {
           "Id": "5c6241f7-6a4f-4972-a314-98fd070f91dd"/*TriggerUpdate*/,
@@ -1461,7 +1456,7 @@
         {
           "Id": "ca8724d8-a362-4af4-bdf8-a80a1b0ef72e"/*FolderWithImages*/,
           "Type": "System.String",
-          "Value": "Resources\\user\\still\\proj-worksforeverybody\\references"
+          "Value": ""
         }
       ],
       "Outputs": []
@@ -2018,7 +2013,7 @@
           "Value": 0.0
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotate*/,
           "Type": "System.Single",
           "Value": 180.0
         },
@@ -2316,11 +2311,6 @@
           "Id": "b4895a95-5ff4-4583-9ec3-befcf0f7b18b"/*B*/,
           "Type": "System.Single",
           "Value": 10.0
-        },
-        {
-          "Id": "fb8d51fe-b4c2-452a-9e53-b649aed92bd7"/*IgnoreTemplate*/,
-          "Type": "System.Boolean",
-          "Value": false
         }
       ],
       "Outputs": []
@@ -3355,7 +3345,7 @@
           "Value": 0.46
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotate*/,
           "Type": "System.Single",
           "Value": 13.0
         },
@@ -3755,7 +3745,7 @@
           "Value": true
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotate*/,
           "Type": "System.Single",
           "Value": 0.0
         },
@@ -4178,7 +4168,7 @@
         {
           "Id": "ca8724d8-a362-4af4-bdf8-a80a1b0ef72e"/*FolderWithImages*/,
           "Type": "System.String",
-          "Value": "Resources\\user\\still\\proj-worksforeverybody\\_shared\\storyboard\\v02"
+          "Value": ""
         }
       ],
       "Outputs": []
@@ -5298,7 +5288,7 @@
           }
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotate*/,
           "Type": "System.Single",
           "Value": 45.0
         },
@@ -5465,7 +5455,7 @@
           "Value": true
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotate*/,
           "Type": "System.Single",
           "Value": -45.0
         },
@@ -5606,7 +5596,7 @@
       "SymbolId": "c6d50423-54ea-4c9d-b547-eb78cc2c950c",
       "InputValues": [
         {
-          "Id": "133bbc5a-bdbf-4993-bd1a-878ec93ee04f"/*Factor*/,
+          "Id": "133bbc5a-bdbf-4993-bd1a-878ec93ee04f"/*Scale*/,
           "Type": "System.Single",
           "Value": 0.125
         }
@@ -5645,7 +5635,7 @@
       "SymbolId": "ca3f3c1b-6f22-4bf3-b06b-d2b0d85a8881",
       "InputValues": [
         {
-          "Id": "0ce5b753-bcc0-4102-b011-64e603a50567"/*Gradient*/,
+          "Id": "0ce5b753-bcc0-4102-b011-64e603a50567"/*FeatherGradient*/,
           "Type": "T3.Core.DataTypes.Gradient",
           "Value": {
             "Gradient": {
@@ -5922,7 +5912,7 @@
           "Value": 0.0
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotate*/,
           "Type": "System.Single",
           "Value": 180.0
         },
@@ -6467,7 +6457,7 @@
         {
           "Id": "ca8724d8-a362-4af4-bdf8-a80a1b0ef72e"/*FolderWithImages*/,
           "Type": "System.String",
-          "Value": "Resources\\user\\still\\proj-worksforeverybody\\_shared\\storyboard\\v02"
+          "Value": ""
         }
       ],
       "Outputs": []
@@ -6522,7 +6512,7 @@
         {
           "Id": "50c9ab21-39f4-4e92-b5a7-ad9e60ae6ec3"/*FontPath*/,
           "Type": "System.String",
-          "Value": "Resources\\fonts\\RobotoSlab-Black.fnt"
+          "Value": "Examples:fonts/RobotoSlab-Black.fnt"
         },
         {
           "Id": "835d7f17-9de4-4612-a2f0-01c1346cdf1a"/*Spacing*/,
@@ -8407,7 +8397,7 @@
         {
           "Id": "50c9ab21-39f4-4e92-b5a7-ad9e60ae6ec3"/*FontPath*/,
           "Type": "System.String",
-          "Value": "Resources\\fonts\\RobotoSlab-Black.fnt"
+          "Value": "Examples:fonts/RobotoSlab-Black.fnt"
         },
         {
           "Id": "d89c518c-a862-4f46-865b-0380350b7417"/*Size*/,
@@ -8443,7 +8433,7 @@
           }
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotate*/,
           "Type": "System.Single",
           "Value": 45.0
         },
@@ -9209,7 +9199,7 @@
           "Value": true
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotate*/,
           "Type": "System.Single",
           "Value": -45.0
         },
