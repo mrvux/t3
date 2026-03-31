@@ -460,12 +460,38 @@ internal sealed partial class AssetLibrary
                                ? absolutePath[..^fileName.Length]
                                : absolutePath;
 
-                CustomComponents.StylizedText($"{StringUtils.GetReadableFileSize(asset.FileSize)}  / {asset.FileSystemInfo?.LastWriteTime}",
-                                              Fonts.FontSmall, UiColors.TextMuted);
                 // FormInputs.AddVerticalSpace(2);
                 // CustomComponents.StylizedText($"in {path}", Fonts.FontSmall, UiColors.TextMuted);
 
                 FormInputs.AddVerticalSpace();
+            }
+            ImGui.EndGroup();
+            //ImGui.SameLine(0,10);
+            
+            ImGui.BeginGroup();
+            {
+                var package = ResourcePackageManager.SharedResourcePackages.FirstOrDefault(p => p.Id == asset.PackageId);
+                ThumbnailManager.GetThumbnail(asset, package).AsImguiImage();
+                FormInputs.AddVerticalSpace();
+            }
+
+            CustomComponents.StylizedText($"File size : {StringUtils.GetReadableFileSize(asset.FileSize)}", Fonts.FontSmall, UiColors.TextMuted);
+            CustomComponents.StylizedText($"Last modified :{asset.FileSystemInfo?.LastWriteTime}",
+                              Fonts.FontSmall, UiColors.TextMuted);
+
+            int useCount = uses != null ? uses.Count : 0;
+
+            string usedString = useCount > 0 ? $"Used by : {useCount} operators" : "Not used by any operator";
+
+            CustomComponents.StylizedText(usedString, Fonts.FontSmall, UiColors.TextMuted);
+
+            //CustomComponents.StylizedText($"Used by : {useCount} operators",
+            //      Fonts.FontSmall, UiColors.TextMuted);
+
+
+            if (ImGui.GetIO().KeyShift)
+            {
+                ImGui.NewLine();
                 if (hasUses && uses != null)
                 {
                     CustomComponents.StylizedText("Symbols using this...", Fonts.FontSmall, UiColors.TextMuted);
@@ -474,22 +500,15 @@ internal sealed partial class AssetLibrary
                         DrawAssetReference(reference);
                     }
                 }
-                else
-                {
-                    CustomComponents.StylizedText("""
-                                                  Not directly used in any parameter. 
-                                                  (Other users are possible...)
-                                                  """, Fonts.FontSmall, UiColors.TextMuted);
-                }
+                //else
+                //{
+                //    CustomComponents.StylizedText("""
+                //                                  Not directly used in any parameter. 
+                //                                  (Other users are possible...)
+                //                                  """, Fonts.FontSmall, UiColors.TextMuted);
+                //}
             }
-            ImGui.EndGroup();
-            ImGui.SameLine(0,10);
-            
-            ImGui.BeginGroup();
-            {
-                var package = ResourcePackageManager.SharedResourcePackages.FirstOrDefault(p => p.Id == asset.PackageId);
-                ThumbnailManager.GetThumbnail(asset, package).AsImguiImage();
-            }
+
             ImGui.EndGroup();
 
         }
