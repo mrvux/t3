@@ -75,6 +75,11 @@ internal sealed partial class AssetLibrary
 
     private void DrawFolder(AssetFolder folder)
     {
+        if (folder.Name.Contains("videos"))
+        {
+
+        }
+
         if (folder.IsHidden)
             return;
 
@@ -90,7 +95,12 @@ internal sealed partial class AssetLibrary
             var isFiltering = _state.CompatibleExtensionIds.Count > 0 || isSearching;
             var isCurrentCompositionPackage = _state.Composition?.Symbol.SymbolPackage.Name == folderName;
 
+
+
             if (isSearching && !hasMatches)
+                return;
+
+            if (isFiltering && !hasMatches)
                 return;
 
             // Open main folders automatically
@@ -107,6 +117,7 @@ internal sealed partial class AssetLibrary
                 ImGui.SetNextItemOpen(true);
                 _state.OpenedProjectsFolderOnce = true;
             }
+
 
             ImGui.PushID(folder.HashCode);
 
